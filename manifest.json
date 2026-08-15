@@ -1,0 +1,19 @@
+{
+  "name": "Fluently — английский для тебя",
+  "short_name": "Fluently",
+  "description": "Личное приложение для изучения английского: слова, грамматика, аудирование, фразы.",
+  "lang": "ru",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F2F1EC",
+  "theme_color": "#1D3A6B",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%231D3A6B'/%3E%3Ctext x='256' y='336' font-size='240' font-family='Georgia,serif' fill='white' text-anchor='middle'%3EF%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
