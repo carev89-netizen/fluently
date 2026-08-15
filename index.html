@@ -264,6 +264,24 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-off
 .livebox{background:var(--surface2);border-radius:12px;padding:11px 14px;font-size:.95rem;
   font-family:ui-serif,"New York",Georgia,serif;color:var(--ink);min-height:44px;line-height:1.45}
 .planhint{font-size:.78rem;color:var(--ink2);text-align:center;line-height:1.45;margin-top:-4px}
+
+/* ============ Прогресс ============ */
+.cardhdr{font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px}
+.metric{margin-bottom:15px}
+.metric:last-child{margin-bottom:0}
+.mrow{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:5px}
+.mlabel{font-size:.9rem;font-weight:600}
+.mval{font-size:.95rem;font-weight:750;font-variant-numeric:tabular-nums;color:var(--ink2)}
+.mval.good{color:var(--good)} .mval.warn{color:var(--warn)} .mval.bad{color:var(--bad)}
+.pbar > div.good{background:var(--good)} .pbar > div.warn{background:var(--warn)} .pbar > div.bad{background:var(--bad)}
+.mnote{font-size:.78rem;color:var(--ink2);line-height:1.45;margin-top:5px}
+.chart{display:flex;align-items:flex-end;gap:4px;height:64px}
+.chart .bar{flex:1;height:100%;display:flex;align-items:flex-end}
+.chart .bar > div{width:100%;background:var(--surface2);border-radius:3px;min-height:3px}
+.chart .bar > div.on{background:var(--accent)}
+.weakcard{border-left:3px solid var(--bad)}
+.weakname{font-size:1.05rem;font-weight:700;margin-bottom:6px;text-wrap:balance}
+#stats-body .btn.small{margin-top:11px;width:100%}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
 .taskcard{background:var(--accent-soft);border-radius:var(--radius);padding:13px 15px;font-size:.95rem;line-height:1.5}
 .taskcard .tl{font-weight:750;color:var(--accent);font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
@@ -302,6 +320,7 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-off
       </div>
       <button class="btn" id="btn-start-session">▶︎&nbsp; Начать занятие</button>
       <div id="plan-hint" class="planhint"></div>
+      <button class="listrow" data-nav="scr-stats"><span class="ic">📊</span><span class="grow"><span class="t">Мой прогресс</span><br><span class="d" id="home-stats-d">Что идёт хорошо, что подтянуть</span></span><span class="arr">›</span></button>
       <div class="sethdr">Тренировки</div>
       <button class="listrow" data-nav="scr-words"><span class="ic">🗂️</span><span><span class="t">Слова</span><br><span class="d" id="home-words-d">Карточки с интервальным повторением</span></span><span class="arr">›</span></button>
       <button class="listrow" data-nav="scr-grammar"><span class="ic">📐</span><span><span class="t">Грамматика</span><br><span class="d" id="home-grammar-d">Темы и упражнения</span></span><span class="arr">›</span></button>
@@ -340,6 +359,15 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-off
       <div class="sethdr">Темы словаря</div>
       <div class="themegrid" id="themes-grid"></div>
     </div>
+  </section>
+
+  <!-- Мой прогресс -->
+  <section class="screen" id="scr-stats">
+    <div class="subhead">
+      <button class="backbtn" data-nav="scr-home" aria-label="Назад">‹</button>
+      <h2>Мой прогресс</h2>
+    </div>
+    <div class="stack" id="stats-body"></div>
   </section>
 
   <!-- Добавить своё слово -->
@@ -2031,6 +2059,9 @@ function startedCount() {
 function gradeWord(id, grade) { // grade: 0 снова, 1 трудно, 2 помню
   const t = todayStr();
   let s = store.data.srs[id] || { lvl: 0, due: t };
+  s.seen = (s.seen || 0) + 1;
+  if (grade === 0) s.lapses = (s.lapses || 0) + 1;
+  else if (grade === 1) s.hard = (s.hard || 0) + 1;
   if (grade === 0) { s.lvl = Math.max(0, s.lvl - 2); s.due = t; }
   else if (grade === 1) { s.lvl = Math.max(1, s.lvl); s.due = addDays(t, Math.max(1, Math.round(INTERVALS[s.lvl] * 0.5))); }
   else { s.lvl = Math.min(INTERVALS.length - 1, s.lvl + 1); s.due = addDays(t, INTERVALS[s.lvl]); }
@@ -2112,15 +2143,104 @@ function show(id) {
   if (id === "scr-grammar") renderGrammar();
   if (id === "scr-listen") renderListenLevels();
   if (id === "scr-speak") { stt.stop(); renderSpeak(); }
+  if (id === "scr-stats") renderStats();
 }
 
+/* ---------------- Аналитика: что идёт хорошо, что проседает ---------------- */
+function analyze() {
+  const srs = store.data.srs;
+  let started = 0, learned = 0, seen = 0, lapses = 0;
+  const hard = [];
+  WORDS.forEach(w => {
+    const s = srs[w.id];
+    if (!s) return;
+    started++;
+    if (s.lvl >= 4) learned++;
+    seen += s.seen || 0;
+    lapses += s.lapses || 0;
+    const trouble = (s.lapses || 0) + (s.hard || 0) * 0.5;
+    if (trouble >= 1) hard.push({ w: w, score: trouble });
+  });
+  hard.sort((a, b) => b.score - a.score);
+  // доля уверенных ответов по карточкам
+  const wordsPct = seen ? Math.round(100 * (seen - lapses) / seen) : null;
+
+  const topics = GRAMMAR.map((g, i) => {
+    const st = store.data.grammar[g.id];
+    return { i: i, title: g.title, done: !!st, pct: st ? Math.round(100 * st.correct / st.total) : null };
+  });
+  const gDone = topics.filter(t => t.done);
+  const grammarPct = gDone.length ? Math.round(gDone.reduce((a, t) => a + t.pct, 0) / gDone.length) : null;
+  const gWeak = gDone.filter(t => t.pct < 80).sort((a, b) => a.pct - b.pct);
+
+  const levels = [1, 2, 3].map(n => {
+    const s = store.data.listening["l" + n] || {};
+    return { level: n, runs: s.runs || 0, pct: s.total ? Math.round(100 * s.correct / s.total) : null, best: s.best || 0 };
+  });
+  const lTot = levels.reduce((a, l) => a + ((store.data.listening["l" + l.level] || {}).total || 0), 0);
+  const lCor = levels.reduce((a, l) => a + ((store.data.listening["l" + l.level] || {}).correct || 0), 0);
+  const listenPct = lTot ? Math.round(100 * lCor / lTot) : null;
+
+  const rKeys = Object.keys(store.data.roleplay);
+  const rRuns = rKeys.reduce((a, k) => a + (store.data.roleplay[k].runs || 0), 0);
+  const rSum = rKeys.reduce((a, k) => a + (store.data.roleplay[k].sum || 0), 0);
+  const speakPct = rRuns ? Math.round(rSum / rRuns) : null;
+
+  // слабое место — самый низкий показатель среди тех, где есть данные
+  const areas = [];
+  if (wordsPct !== null && seen >= 10) areas.push({ area: "words", pct: wordsPct, label: "Слова" });
+  if (grammarPct !== null) areas.push({ area: "grammar", pct: grammarPct, label: "Грамматика" });
+  if (listenPct !== null) areas.push({ area: "listen", pct: listenPct, label: "Аудирование" });
+  if (speakPct !== null) areas.push({ area: "speak", pct: speakPct, label: "Говорение" });
+  areas.sort((a, b) => a.pct - b.pct);
+  let weak = areas.length ? areas[0] : null;
+  if (weak && weak.pct >= 85) weak = null; // всё ровно — ничего не навязываем
+  if (weak && weak.area === "grammar" && gWeak.length) {
+    weak.topicIdx = gWeak[0].i; weak.topicTitle = gWeak[0].title; weak.topicPct = gWeak[0].pct;
+  }
+
+  return {
+    words: { started: started, learned: learned, total: WORDS.length, pct: wordsPct, hard: hard, seen: seen },
+    grammar: { pct: grammarPct, done: gDone.length, total: GRAMMAR.length, topics: topics, weak: gWeak },
+    listen: { pct: listenPct, levels: levels, runs: levels.reduce((a, l) => a + l.runs, 0) },
+    speak: { pct: speakPct, runs: rRuns, done: rKeys.length, total: ROLEPLAY.length },
+    areas: areas, weak: weak
+  };
+}
+
+const AREA_ADVICE = {
+  words: "Слова забываются — это нормально. Главное не увеличивать порцию, а заходить каждый день: повторения важнее новых слов.",
+  grammar: "Грамматика проседает точечно. Перечитай теорию слабой темы и пройди упражнения ещё раз — со второго прохода откладывается.",
+  listen: "Ухо тренируется медленнее всего. Пользуйся 🐢 — медленным пословным повтором, и слушай фразу до конца, не угадывая по первым словам.",
+  speak: "Говорение подтягивается повторением вслух. Не бойся пауз: запись ждёт, пока ты сформулируешь."
+};
+
 /* ---------------- Занятие дня: карточки → аудирование → говорение ---------------- */
-const PLAN_STEPS = [
+const BASE_STEPS = [
   { icon: "🗂️", label: "Карточки", run: () => startSession() },
   { icon: "🎧", label: "Аудирование", run: () => startListening(suggestedLevel()) },
   { icon: "🎙️", label: "Говорить", run: () => startRoleplay(nextScenario()) }
 ];
 const dayPlan = { active: false };
+
+/* Четвёртый шаг подбирается под то, что проседает */
+function extraStep(a) {
+  const w = a.weak;
+  if (!w) return null;
+  if (w.area === "grammar" && w.topicIdx !== undefined)
+    return { icon: "📐", label: "Грамматика: " + w.topicTitle, why: "тут " + w.topicPct + "%", run: () => startGex(w.topicIdx) };
+  if (w.area === "listen")
+    return { icon: "🎧", label: "Ещё аудирование", why: "тут " + w.pct + "%", run: () => startListening(suggestedLevel()) };
+  if (w.area === "speak")
+    return { icon: "🎙️", label: "Ещё диалог", why: "тут " + w.pct + "%", run: () => startRoleplay(nextScenario()) };
+  if (w.area === "words" && a.words.hard.length >= 4)
+    return { icon: "🔁", label: "Трудные слова", why: a.words.hard.length + " слов буксуют", run: () => startHardWords() };
+  return null;
+}
+function planSteps() {
+  const ex = extraStep(analyze());
+  return ex ? BASE_STEPS.concat([ex]) : BASE_STEPS.slice();
+}
 
 function planState() {
   const p = store.data.plan;
@@ -2139,35 +2259,47 @@ function nextScenario() {
 }
 function startDailyPlan() {
   dayPlan.active = true;
+  dayPlan.steps = planSteps(); // фиксируем состав на время занятия
   runPlanStep();
 }
 function runPlanStep() {
   const p = planState();
-  if (p.step >= PLAN_STEPS.length) { dayPlan.active = false; show("scr-home"); return; }
-  PLAN_STEPS[p.step].run();
+  const steps = dayPlan.steps || planSteps();
+  if (p.step >= steps.length) { dayPlan.active = false; show("scr-home"); return; }
+  steps[p.step].run();
 }
 /* Кнопки в конце этапа: ведём дальше по плану либо отдаём обычные кнопки */
 function planDoneButtons(box, fallback) {
   if (!dayPlan.active) { fallback.forEach(b => box.appendChild(b)); return; }
   const p = planState();
+  const steps = dayPlan.steps || planSteps();
   p.step++;
   store.save();
-  if (p.step >= PLAN_STEPS.length) {
+  if (p.step >= steps.length) {
     dayPlan.active = false;
-    box.appendChild(el("div", "feedback ok", "🏆 Занятие дня выполнено — все три шага пройдены. Так держать!"));
+    box.appendChild(el("div", "feedback ok", "🏆 Занятие дня выполнено — все шаги пройдены. Так держать!"));
     const b = el("button", "btn", "На главную");
     b.onclick = () => show("scr-home");
     box.appendChild(b);
     return;
   }
-  const nx = PLAN_STEPS[p.step];
-  box.appendChild(el("div", "chip acc", "шаг " + p.step + " из " + PLAN_STEPS.length + " пройден"));
+  const nx = steps[p.step];
+  box.appendChild(el("div", "chip acc", "шаг " + p.step + " из " + steps.length + " пройден"));
   const b = el("button", "btn", "Дальше: " + nx.icon + " " + nx.label);
   b.onclick = () => runPlanStep();
   box.appendChild(b);
+  if (nx.why) box.appendChild(el("div", "planhint", "Добавлено к плану: " + nx.why));
   const stop = el("button", "btn ghost small", "Закончить занятие");
   stop.onclick = () => { dayPlan.active = false; show("scr-home"); };
   box.appendChild(stop);
+}
+
+/* Сессия только из «буксующих» слов */
+function startHardWords() {
+  const a = analyze();
+  const list = a.words.hard.slice(0, 15).map(h => h.w);
+  if (!list.length) { startSession(); return; }
+  runCardQueue(list);
 }
 
 /* ---------------- Главная ---------------- */
@@ -2177,20 +2309,26 @@ function renderHome() {
   $("st-learned").textContent = learnedCount();
   $("st-today").textContent = store.data.days[todayStr()] || 0;
   $("home-words-d").textContent = startedCount() + " из " + WORDS.length + " слов в работе";
-  // Занятие дня
+  // Занятие дня (состав подстраивается под слабое место)
+  const an = analyze();
+  const steps = planSteps();
   const p = planState();
   const btn = $("btn-start-session");
-  if (p.step >= PLAN_STEPS.length) {
+  if (p.step >= steps.length) {
     btn.innerHTML = "✓&nbsp; Занятие сегодня выполнено";
     btn.classList.add("soft");
     $("plan-hint").textContent = "Можно пройти ещё раз — или просто повторить карточки.";
   } else {
-    const nx = PLAN_STEPS[p.step];
+    const nx = steps[p.step];
     btn.classList.remove("soft");
     btn.innerHTML = "▶︎&nbsp; " + (p.step === 0 ? "Начать занятие" : "Продолжить занятие");
-    $("plan-hint").textContent = PLAN_STEPS.map((s, i) =>
-      (i < p.step ? "✓ " : "") + s.icon + " " + s.label).join("  ·  ") + " — дальше " + nx.label.toLowerCase();
+    $("plan-hint").innerHTML = steps.map((s, i) =>
+      (i < p.step ? "✓ " : "") + s.icon + " " + esc(s.label)).join("  ·  ") +
+      "<br>дальше — " + esc(nx.label.toLowerCase()) + (nx.why ? " <b>(" + esc(nx.why) + ")</b>" : "");
   }
+  $("home-stats-d").textContent = an.weak
+    ? "Слабое место: " + an.weak.label.toLowerCase() + " · " + an.weak.pct + "%"
+    : "Что идёт хорошо, что подтянуть";
   const g = Object.keys(store.data.grammar).length;
   $("home-grammar-d").textContent = g ? ("Пройдено тем: " + g + " из " + GRAMMAR.length) : (GRAMMAR.length + " тем с упражнениями");
   // настройки
@@ -2199,6 +2337,109 @@ function renderHome() {
   $("dir-ru").classList.toggle("on", store.data.settings.direction === "ru");
   document.querySelectorAll("[data-rate]").forEach(b =>
     b.classList.toggle("on", parseFloat(b.dataset.rate) === store.data.settings.rate));
+}
+
+/* ---------------- Экран «Мой прогресс» ---------------- */
+function pctBar(label, pct, note) {
+  const val = pct === null ? "—" : pct + "%";
+  const tone = pct === null ? "" : (pct >= 85 ? "good" : pct >= 70 ? "warn" : "bad");
+  return "<div class='metric'>" +
+    "<div class='mrow'><span class='mlabel'>" + esc(label) + "</span><span class='mval " + tone + "'>" + val + "</span></div>" +
+    "<div class='pbar'><div style='width:" + (pct === null ? 0 : pct) + "%' class='" + tone + "'></div></div>" +
+    (note ? "<div class='mnote'>" + esc(note) + "</div>" : "") + "</div>";
+}
+
+function renderStats() {
+  const a = analyze();
+  const box = $("stats-body");
+  box.innerHTML = "";
+
+  // Активность за 14 дней
+  const days = [];
+  for (let i = 13; i >= 0; i--) days.push(addDays(todayStr(), -i));
+  const counts = days.map(d => store.data.days[d] || 0);
+  const max = Math.max(1, Math.max.apply(null, counts));
+  const activeDays = counts.filter(c => c > 0).length;
+  const chart = el("div", "card");
+  chart.innerHTML = "<div class='cardhdr'>Активность за две недели</div>" +
+    "<div class='chart'>" + counts.map((c, i) =>
+      "<div class='bar' title='" + days[i] + "'><div style='height:" +
+      (c ? Math.max(9, Math.round(100 * c / max)) : 3) + "%' class='" + (c ? "on" : "") + "'></div></div>").join("") + "</div>" +
+    "<div class='mnote'>Занимался(ась) " + activeDays + " из 14 дней · серия " + currentStreak() + " 🔥</div>";
+  box.appendChild(chart);
+
+  // Слабое место
+  const weakCard = el("div", "card");
+  if (!a.weak) {
+    const enough = a.areas.length;
+    weakCard.innerHTML = "<div class='cardhdr'>Где подтянуть</div>" +
+      "<div class='mnote'>" + (enough
+        ? "Сейчас всё ровно — заметных провалов нет. Продолжай в том же ритме."
+        : "Пока мало данных. Пройди занятие пару дней — и я покажу, что проседает.") + "</div>";
+  } else {
+    weakCard.className = "card weakcard";
+    const shownPct = a.weak.topicTitle ? a.weak.topicPct : a.weak.pct;
+    weakCard.innerHTML = "<div class='cardhdr'>Где подтянуть</div>" +
+      "<div class='weakname'>" + esc(a.weak.label) +
+      (a.weak.topicTitle ? " · " + esc(a.weak.topicTitle) : "") +
+      " <span class='mval bad'>" + shownPct + "%</span></div>" +
+      (a.weak.topicTitle ? "<div class='mnote'>Самая слабая тема; по грамматике в среднем " + a.weak.pct + "%.</div>" : "") +
+      "<div class='mnote'>" + esc(AREA_ADVICE[a.weak.area]) + "</div>";
+    const ex = extraStep(a);
+    if (ex) {
+      const b = el("button", "btn small", ex.icon + " " + ex.label + " — позаниматься сейчас");
+      b.onclick = () => { dayPlan.active = false; ex.run(); };
+      weakCard.appendChild(b);
+      weakCard.appendChild(el("div", "mnote", "Этот блок приложение уже добавило в твоё занятие дня."));
+    }
+  }
+  box.appendChild(weakCard);
+
+  // Показатели по разделам
+  const m = el("div", "card");
+  m.innerHTML = "<div class='cardhdr'>Как идут дела</div>" +
+    pctBar("Слова — уверенные ответы", a.words.pct, a.words.learned + " выучено · " + a.words.started + " в работе из " + a.words.total) +
+    pctBar("Грамматика", a.grammar.pct, "пройдено тем: " + a.grammar.done + " из " + a.grammar.total) +
+    pctBar("Аудирование", a.listen.pct, a.listen.runs ? "раундов: " + a.listen.runs : "ещё не пробовал(а)") +
+    pctBar("Говорение", a.speak.pct, a.speak.runs ? "диалогов пройдено: " + a.speak.done + " из " + a.speak.total : "ещё не пробовал(а)");
+  box.appendChild(m);
+
+  // Трудные слова
+  if (a.words.hard.length) {
+    const h = el("div", "card");
+    h.innerHTML = "<div class='cardhdr'>Буксуют (" + a.words.hard.length + ")</div>";
+    a.words.hard.slice(0, 8).forEach(x => {
+      const row = el("div", "phraserow");
+      row.innerHTML = "<span class='grow'><span class='pen en'>" + esc(x.w.en) + "</span>" +
+        "<div class='pru'>" + esc(x.w.ru) + "</div></span><span class='chip'>✗ " + Math.round(x.score) + "</span>";
+      const sp = el("button", "speakbtn", "🔊");
+      sp.onclick = () => tts.speak(x.w.en);
+      row.appendChild(sp);
+      h.appendChild(row);
+    });
+    const b = el("button", "btn small", "🔁 Прогнать трудные слова");
+    b.onclick = () => { dayPlan.active = false; startHardWords(); };
+    h.appendChild(b);
+    box.appendChild(h);
+  }
+
+  // Грамматика по темам
+  const gd = a.grammar.topics.filter(t => t.done);
+  if (gd.length) {
+    const g = el("div", "card");
+    g.innerHTML = "<div class='cardhdr'>Грамматика по темам</div>";
+    gd.slice().sort((x, y) => x.pct - y.pct).forEach(t => {
+      const row = el("button", "phraserow");
+      row.style.width = "100%";
+      row.style.textAlign = "left";
+      const tone = t.pct >= 85 ? "good" : t.pct >= 70 ? "warn" : "bad";
+      row.innerHTML = "<span class='grow'><span style='font-weight:600;font-size:.92rem'>" + esc(t.title) + "</span></span>" +
+        "<span class='mval " + tone + "'>" + t.pct + "%</span>";
+      row.onclick = () => openGrammarTopic(t.i);
+      g.appendChild(row);
+    });
+    box.appendChild(g);
+  }
 }
 
 /* ---------------- Слова ---------------- */
@@ -2276,6 +2517,11 @@ function startSession() {
     $("sess-card").appendChild(d);
     return;
   }
+  runCardQueue(session.queue);
+}
+
+function runCardQueue(list) {
+  session.queue = list.slice();
   // перемешиваем
   for (let i = session.queue.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -2446,7 +2692,8 @@ function renderGexQuestion() {
   if (gex.idx >= total) {
     $("gex-count").textContent = "";
     $("gex-bar").style.width = "100%";
-    store.data.grammar[g.id] = { correct: gex.correct, total: total };
+    const gprev = store.data.grammar[g.id] || {};
+    store.data.grammar[g.id] = { correct: gex.correct, total: total, runs: (gprev.runs || 0) + 1 };
     markActivity();
     const good = gex.correct >= Math.ceil(total * 0.75);
     const d = el("div", "card donebox",
@@ -2534,8 +2781,13 @@ function renderLsess() {
     $("lsess-count").textContent = "";
     $("lsess-bar").style.width = "100%";
     const key = "l" + lsess.level;
-    const prev = store.data.listening[key];
-    store.data.listening[key] = { best: Math.max(prev ? prev.best : 0, lsess.correct) };
+    const prev = store.data.listening[key] || {};
+    store.data.listening[key] = {
+      best: Math.max(prev.best || 0, lsess.correct),
+      correct: (prev.correct || 0) + lsess.correct,
+      total: (prev.total || 0) + total,
+      runs: (prev.runs || 0) + 1
+    };
     markActivity();
     const d = el("div", "card donebox",
       "<div class='big'>" + (lsess.correct >= 8 ? "👂✨" : "🎧") + "</div><h3>" + lsess.correct + " из " + total + "</h3><p>" +
@@ -2783,8 +3035,12 @@ function renderRstep() {
     $("rsess-bar").style.width = "100%";
     const pct = rsess.keysTotal ? Math.round(100 * rsess.hits / rsess.keysTotal) : 100;
     const key = "r" + rsess.sc;
-    const prev = store.data.roleplay[key];
-    store.data.roleplay[key] = { best: Math.max(prev ? prev.best : 0, pct) };
+    const prev = store.data.roleplay[key] || {};
+    store.data.roleplay[key] = {
+      best: Math.max(prev.best || 0, pct),
+      sum: (prev.sum || 0) + pct,
+      runs: (prev.runs || 0) + 1
+    };
     markActivity();
     const d = el("div", "card donebox",
       "<div class='big'>" + (pct >= 70 ? "🗣️✨" : "🎙️") + "</div><h3>Диалог пройден: " + pct + "%</h3><p>" +
