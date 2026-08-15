@@ -260,6 +260,10 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-off
 }
 .micbtn:active{transform:scale(.95)}
 .micbtn.listening{background:var(--red);animation:pulse 1.1s ease infinite}
+.michint{text-align:center;font-size:.78rem;color:var(--ink2);line-height:1.45;padding:0 10px}
+.livebox{background:var(--surface2);border-radius:12px;padding:11px 14px;font-size:.95rem;
+  font-family:ui-serif,"New York",Georgia,serif;color:var(--ink);min-height:44px;line-height:1.45}
+.planhint{font-size:.78rem;color:var(--ink2);text-align:center;line-height:1.45;margin-top:-4px}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
 .taskcard{background:var(--accent-soft);border-radius:var(--radius);padding:13px 15px;font-size:.95rem;line-height:1.5}
 .taskcard .tl{font-weight:750;color:var(--accent);font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
@@ -297,6 +301,7 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-off
         <div class="stat"><div class="num" id="st-today">0</div><div class="lbl">сегодня</div></div>
       </div>
       <button class="btn" id="btn-start-session">▶︎&nbsp; Начать занятие</button>
+      <div id="plan-hint" class="planhint"></div>
       <div class="sethdr">Тренировки</div>
       <button class="listrow" data-nav="scr-words"><span class="ic">🗂️</span><span><span class="t">Слова</span><br><span class="d" id="home-words-d">Карточки с интервальным повторением</span></span><span class="arr">›</span></button>
       <button class="listrow" data-nav="scr-grammar"><span class="ic">📐</span><span><span class="t">Грамматика</span><br><span class="d" id="home-grammar-d">Темы и упражнения</span></span><span class="arr">›</span></button>
@@ -1971,6 +1976,7 @@ const store = {
     this.data.roleplay = this.data.roleplay || {};
     this.data.custom = this.data.custom || [];
     this.data.customSeq = this.data.customSeq || 0;
+    this.data.plan = this.data.plan || { date: null, step: 0 };
   },
   save() {
     try { localStorage.setItem(this.key, JSON.stringify(this.data)); } catch (e) {}
@@ -2108,6 +2114,62 @@ function show(id) {
   if (id === "scr-speak") { stt.stop(); renderSpeak(); }
 }
 
+/* ---------------- Занятие дня: карточки → аудирование → говорение ---------------- */
+const PLAN_STEPS = [
+  { icon: "🗂️", label: "Карточки", run: () => startSession() },
+  { icon: "🎧", label: "Аудирование", run: () => startListening(suggestedLevel()) },
+  { icon: "🎙️", label: "Говорить", run: () => startRoleplay(nextScenario()) }
+];
+const dayPlan = { active: false };
+
+function planState() {
+  const p = store.data.plan;
+  if (p.date !== todayStr()) { p.date = todayStr(); p.step = 0; store.save(); }
+  return p;
+}
+function suggestedLevel() {
+  const l = store.data.listening;
+  if (l.l2 && l.l2.best >= 8) return 3;
+  if (l.l1 && l.l1.best >= 8) return 2;
+  return 1;
+}
+function nextScenario() {
+  for (let i = 0; i < ROLEPLAY.length; i++) if (!store.data.roleplay["r" + i]) return i;
+  return Object.keys(store.data.roleplay).length % ROLEPLAY.length;
+}
+function startDailyPlan() {
+  dayPlan.active = true;
+  runPlanStep();
+}
+function runPlanStep() {
+  const p = planState();
+  if (p.step >= PLAN_STEPS.length) { dayPlan.active = false; show("scr-home"); return; }
+  PLAN_STEPS[p.step].run();
+}
+/* Кнопки в конце этапа: ведём дальше по плану либо отдаём обычные кнопки */
+function planDoneButtons(box, fallback) {
+  if (!dayPlan.active) { fallback.forEach(b => box.appendChild(b)); return; }
+  const p = planState();
+  p.step++;
+  store.save();
+  if (p.step >= PLAN_STEPS.length) {
+    dayPlan.active = false;
+    box.appendChild(el("div", "feedback ok", "🏆 Занятие дня выполнено — все три шага пройдены. Так держать!"));
+    const b = el("button", "btn", "На главную");
+    b.onclick = () => show("scr-home");
+    box.appendChild(b);
+    return;
+  }
+  const nx = PLAN_STEPS[p.step];
+  box.appendChild(el("div", "chip acc", "шаг " + p.step + " из " + PLAN_STEPS.length + " пройден"));
+  const b = el("button", "btn", "Дальше: " + nx.icon + " " + nx.label);
+  b.onclick = () => runPlanStep();
+  box.appendChild(b);
+  const stop = el("button", "btn ghost small", "Закончить занятие");
+  stop.onclick = () => { dayPlan.active = false; show("scr-home"); };
+  box.appendChild(stop);
+}
+
 /* ---------------- Главная ---------------- */
 function renderHome() {
   $("home-streak").textContent = "🔥 " + currentStreak();
@@ -2115,6 +2177,20 @@ function renderHome() {
   $("st-learned").textContent = learnedCount();
   $("st-today").textContent = store.data.days[todayStr()] || 0;
   $("home-words-d").textContent = startedCount() + " из " + WORDS.length + " слов в работе";
+  // Занятие дня
+  const p = planState();
+  const btn = $("btn-start-session");
+  if (p.step >= PLAN_STEPS.length) {
+    btn.innerHTML = "✓&nbsp; Занятие сегодня выполнено";
+    btn.classList.add("soft");
+    $("plan-hint").textContent = "Можно пройти ещё раз — или просто повторить карточки.";
+  } else {
+    const nx = PLAN_STEPS[p.step];
+    btn.classList.remove("soft");
+    btn.innerHTML = "▶︎&nbsp; " + (p.step === 0 ? "Начать занятие" : "Продолжить занятие");
+    $("plan-hint").textContent = PLAN_STEPS.map((s, i) =>
+      (i < p.step ? "✓ " : "") + s.icon + " " + s.label).join("  ·  ") + " — дальше " + nx.label.toLowerCase();
+  }
   const g = Object.keys(store.data.grammar).length;
   $("home-grammar-d").textContent = g ? ("Пройдено тем: " + g + " из " + GRAMMAR.length) : (GRAMMAR.length + " тем с упражнениями");
   // настройки
@@ -2194,6 +2270,9 @@ function startSession() {
     $("sess-bar").style.width = "100%";
     const d = el("div", "card donebox",
       "<div class='big'>🎉</div><h3>На сегодня всё!</h3><p>Все карточки повторены. Возвращайся завтра — или добавь новых слов в настройках.</p>");
+    const back = el("button", "btn", "На главную");
+    back.onclick = () => show("scr-home");
+    planDoneButtons(d, [back]);
     $("sess-card").appendChild(d);
     return;
   }
@@ -2220,7 +2299,7 @@ function nextCard() {
       "<div class='big'>💪</div><h3>Сессия завершена</h3><p>Карточек пройдено: " + session.done + ". Отличная работа!</p>");
     const b = el("button", "btn", "На главную");
     b.onclick = () => show("scr-home");
-    d.appendChild(b);
+    planDoneButtons(d, [b]);
     $("sess-card").appendChild(d);
     return;
   }
@@ -2462,10 +2541,10 @@ function renderLsess() {
       "<div class='big'>" + (lsess.correct >= 8 ? "👂✨" : "🎧") + "</div><h3>" + lsess.correct + " из " + total + "</h3><p>" +
       (lsess.correct >= 8 ? "Отличный слух! Попробуй уровень посложнее." : "Слушай медленную версию и повторяй за диктором — прогресс придёт быстро.") + "</p>");
     const again = el("button", "btn ghost", "Ещё раз");
-    again.onclick = () => startListening(lsess.level);
+    again.onclick = () => { dayPlan.active = false; startListening(lsess.level); };
     const back = el("button", "btn", "К уровням");
     back.onclick = () => show("scr-listen");
-    d.appendChild(again); d.appendChild(back);
+    planDoneButtons(d, [again, back]);
     box.appendChild(d);
     return;
   }
@@ -2513,34 +2592,116 @@ function renderLsess() {
 }
 
 /* ---------------- Говорить: ролевые диалоги ---------------- */
+/* Запись держится открытой, пока ученик сам не нажмёт «готово»:
+   тишина её не обрывает — можно спокойно подумать и переформулировать */
 const stt = {
   api: window.SpeechRecognition || window.webkitSpeechRecognition || null,
   rec: null,
-  broken: false, // микрофон недоступен — переходим в режим самопроверки
+  broken: false,       // микрофон недоступен — переходим в режим самопроверки
+  active: false,       // идёт запись
+  finals: [],          // распознанные куски (каждый — массив альтернатив)
+  interim: "",
+  restarts: 0,
+  _opts: null,
+  _finishing: false,
+  _timer: null,
   get available() { return !!this.api && !this.broken; },
-  listen(onResult, onFail) {
-    try {
-      const r = new this.api();
-      this.rec = r;
-      r.lang = "en-US";
-      r.interimResults = false;
-      r.maxAlternatives = 4;
-      let got = false;
-      r.onresult = (e) => {
-        got = true;
-        const alts = [];
-        for (let i = 0; i < e.results[0].length; i++) alts.push(e.results[0][i].transcript);
-        onResult(alts);
-      };
-      r.onerror = (e) => {
-        if (e.error === "not-allowed" || e.error === "service-not-allowed" || e.error === "audio-capture") this.broken = true;
-        if (!got) onFail(e.error || "error");
-      };
-      r.onend = () => { if (!got) onFail("no-speech"); };
-      r.start();
-    } catch (e) { this.broken = true; onFail("exception"); }
+
+  start(opts) {
+    this.finals = [];
+    this.interim = "";
+    this.restarts = 0;
+    this._opts = opts;
+    this._finishing = false;
+    this.active = true;
+    this._spin();
   },
-  stop() { try { if (this.rec) this.rec.abort(); } catch (e) {} }
+
+  _spin() {
+    let r;
+    try { r = new this.api(); }
+    catch (e) { this.broken = true; this.active = false; this._opts.onFail("exception"); return; }
+    this.rec = r;
+    r.lang = "en-US";
+    r.continuous = true;      // не завершать после первой фразы
+    r.interimResults = true;  // показываем речь на лету
+    r.maxAlternatives = 4;
+    r.onresult = (e) => {
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const res = e.results[i];
+        if (res.isFinal) {
+          const alts = [];
+          for (let j = 0; j < res.length; j++) alts.push(res[j].transcript);
+          this.finals.push(alts);
+        } else {
+          interim += res[0].transcript;
+        }
+      }
+      this.interim = interim;
+      if (this._opts && this._opts.onInterim) this._opts.onInterim((this.text() + " " + interim).trim());
+    };
+    r.onerror = (e) => {
+      const err = e.error || "error";
+      if (err === "not-allowed" || err === "service-not-allowed" || err === "audio-capture") {
+        this.broken = true; this.active = false; this._finishing = false;
+        if (this._opts) this._opts.onFail(err);
+      }
+      // no-speech / aborted / network — не считаем концом: перезапустимся в onend
+    };
+    r.onend = () => {
+      if (this.active) {
+        // движок сам оборвал запись по тишине — поднимаем её обратно
+        if (this.restarts++ > 40) { this.active = false; this._finishing = true; this._deliver(); return; }
+        try { r.start(); } catch (e) { this._spin(); }
+      } else if (this._finishing) {
+        this._deliver();
+      }
+    };
+    try { r.start(); }
+    catch (e) {
+      if (this.restarts++ > 40) { this.active = false; this._opts.onFail("exception"); return; }
+      setTimeout(() => { if (this.active) this._spin(); }, 120);
+    }
+  },
+
+  text() { return this.finals.map(a => a[0]).join(" ").trim(); },
+
+  /* До трёх вариантов расшифровки — собираем из альтернатив каждого куска */
+  alts() {
+    const base = this.text() || this.interim.trim();
+    if (!base) return [];
+    const combos = [base];
+    for (let k = 1; k < 3; k++) {
+      const s = this.finals.map(a => a[Math.min(k, a.length - 1)]).join(" ").trim();
+      if (s && combos.indexOf(s) === -1) combos.push(s);
+    }
+    return combos;
+  },
+
+  /* Ученик нажал «готово» */
+  finish() {
+    if (!this.active) return;
+    this.active = false;
+    this._finishing = true;
+    this._timer = setTimeout(() => this._deliver(), 1500); // если onend не придёт
+    try { if (this.rec) this.rec.stop(); } catch (e) { this._deliver(); }
+  },
+
+  _deliver() {
+    if (!this._finishing) return;
+    this._finishing = false;
+    clearTimeout(this._timer);
+    const a = this.alts();
+    if (!a.length) this._opts.onFail("no-speech");
+    else this._opts.onFinish(a);
+  },
+
+  stop() {
+    this.active = false; this._finishing = false;
+    clearTimeout(this._timer);
+    try { if (this.rec) this.rec.abort(); } catch (e) {}
+  }
 };
 
 const NUM_WORDS = { "1":"one","2":"two","3":"three","4":"four","5":"five","6":"six","7":"seven","8":"eight","9":"nine","10":"ten","11":"eleven","12":"twelve","20":"twenty","30":"thirty" };
@@ -2629,10 +2790,10 @@ function renderRstep() {
       "<div class='big'>" + (pct >= 70 ? "🗣️✨" : "🎙️") + "</div><h3>Диалог пройден: " + pct + "%</h3><p>" +
       (pct >= 70 ? "Отлично! Тебя бы поняли. Попробуй другой сценарий." : "Хорошее начало. Пройди сценарий ещё раз — во второй раз фразы строятся гораздо легче.") + "</p>");
     const again = el("button", "btn ghost", "Ещё раз");
-    again.onclick = () => startRoleplay(rsess.sc);
+    again.onclick = () => { dayPlan.active = false; startRoleplay(rsess.sc); };
     const back = el("button", "btn", "К сценариям");
     back.onclick = () => show("scr-speak");
-    d.appendChild(again); d.appendChild(back);
+    planDoneButtons(d, [again, back]);
     box.appendChild(d);
     return;
   }
@@ -2662,23 +2823,37 @@ function renderAnswerZone(zone, st) {
   if (stt.available) {
     const mic = el("button", "micbtn", "🎙️");
     mic.setAttribute("aria-label", "Говорить");
-    const hint = el("div", "", "<div style='text-align:center;font-size:.78rem;color:var(--ink2)'>Нажми и говори по-английски</div>");
-    zone.appendChild(mic); zone.appendChild(hint);
+    const hint = el("div", "michint", "Нажми и говори — обдумывай сколько нужно, запись не прервётся");
+    const live = el("div", "livebox hidden", "");
+    zone.appendChild(mic); zone.appendChild(hint); zone.appendChild(live);
+    let listening = false;
     mic.onclick = () => {
-      tts.stop();
-      mic.classList.add("listening");
-      mic.textContent = "…";
-      hint.innerHTML = "<div style='text-align:center;font-size:.78rem;color:var(--red);font-weight:700'>Слушаю…</div>";
-      stt.listen(
-        (alts) => finishAnswer(zone, st, alts),
-        (err) => {
-          mic.classList.remove("listening");
-          mic.textContent = "🎙️";
-          if (!stt.available) { renderAnswerZone(zone, st); return; } // ушли в самопроверку
-          hint.innerHTML = "<div style='text-align:center;font-size:.78rem;color:var(--ink2)'>" +
-            (err === "no-speech" ? "Не расслышал — попробуй ещё раз, говори громче." : "Не получилось — попробуй ещё раз.") + "</div>";
-        }
-      );
+      if (!listening) {
+        tts.stop();
+        listening = true;
+        mic.classList.add("listening");
+        mic.textContent = "⏹";
+        mic.setAttribute("aria-label", "Закончить и проверить");
+        hint.innerHTML = "<b style='color:var(--red)'>Слушаю…</b> сказал — нажми ⏹, чтобы проверить";
+        live.classList.remove("hidden");
+        live.textContent = "…";
+        stt.start({
+          onInterim: (t) => { live.textContent = t || "…"; },
+          onFinish: (alts) => { listening = false; finishAnswer(zone, st, alts); },
+          onFail: (err) => {
+            listening = false;
+            mic.classList.remove("listening");
+            mic.textContent = "🎙️";
+            live.classList.add("hidden");
+            if (!stt.available) { renderAnswerZone(zone, st); return; } // ушли в самопроверку
+            hint.innerHTML = (err === "no-speech" ? "Ничего не расслышал — нажми 🎙️ и говори чуть громче." : "Не получилось — попробуй ещё раз.");
+          }
+        });
+      } else {
+        mic.textContent = "…";
+        hint.innerHTML = "Проверяю…";
+        stt.finish();
+      }
     };
   } else {
     if (stt.broken) zone.appendChild(el("div", "card", micBlockedNote()));
@@ -2796,15 +2971,29 @@ function openSituation(i) {
   show("scr-situation");
 }
 
-/* «Повтори фразу»: слушаем ученика и показываем пословный разбор */
+/* «Повтори фразу»: первое нажатие — запись, второе — проверка */
 function practicePhrase(zone, mic, text) {
+  if (mic.dataset.on === "1") { // второе нажатие — завершаем
+    mic.dataset.on = "";
+    mic.textContent = "🎙️";
+    mic.classList.remove("listening");
+    zone.innerHTML = "<div style='font-size:.78rem;color:var(--ink2)'>Проверяю…</div>";
+    stt.finish();
+    return;
+  }
   tts.stop();
   zone.classList.remove("hidden");
   mic.classList.add("listening");
-  zone.innerHTML = "<div style='font-size:.78rem;color:var(--red);font-weight:700'>Слушаю… повтори фразу по-английски</div>";
-  stt.listen(
-    (alts) => {
-      mic.classList.remove("listening");
+  mic.textContent = "⏹";
+  mic.dataset.on = "1";
+  zone.innerHTML = "<div style='font-size:.78rem;color:var(--red);font-weight:700'>Слушаю… скажи фразу и нажми ⏹</div>";
+  stt.start({
+    onInterim: (t) => {
+      zone.innerHTML = "<div style='font-size:.78rem;color:var(--red);font-weight:700'>Слушаю… нажми ⏹, когда закончишь</div>" +
+        "<div class='livebox' style='margin-top:6px'>" + esc(t || "…") + "</div>";
+    },
+    onFinish: (alts) => {
+      mic.dataset.on = ""; mic.textContent = "🎙️"; mic.classList.remove("listening");
       const d = wordDiff(text, alts);
       zone.innerHTML =
         "<div class='saidbox'><div class='sl'>Ты сказал(а)</div><span class='en'>" + esc(alts[0]) + "</span></div>" +
@@ -2812,13 +3001,13 @@ function practicePhrase(zone, mic, text) {
         "<div class='feedback " + (d.pct >= 75 ? "ok" : "no") + "' style='margin-top:7px'>" +
         (d.pct >= 75 ? "✓ Отлично! Совпадение " + d.pct + "%" : "Совпадение " + d.pct + "%. Красные слова не прозвучали — послушай 🔊 и попробуй ещё раз 🎙️") + "</div>";
     },
-    (err) => {
-      mic.classList.remove("listening");
+    onFail: (err) => {
+      mic.dataset.on = ""; mic.textContent = "🎙️"; mic.classList.remove("listening");
       if (stt.broken) { zone.innerHTML = micBlockedNote(); return; }
       zone.innerHTML = "<div style='font-size:.78rem;color:var(--ink2)'>" +
-        (err === "no-speech" ? "Не расслышал — нажми 🎙️ и говори сразу после нажатия." : "Не получилось, попробуй ещё раз.") + "</div>";
+        (err === "no-speech" ? "Ничего не расслышал — нажми 🎙️ и говори чуть громче." : "Не получилось, попробуй ещё раз.") + "</div>";
     }
-  );
+  });
 }
 function openDialogue(i) {
   const d = DIALOGUES[i];
@@ -2860,8 +3049,8 @@ function init() {
   document.querySelectorAll("[data-nav]").forEach(b => b.addEventListener("click", () => show(b.dataset.nav)));
   document.querySelectorAll("#tabbar [data-tab]").forEach(b => b.addEventListener("click", () => show(b.dataset.tab)));
 
-  $("btn-start-session").onclick = startSession;
-  $("btn-words-study").onclick = startSession;
+  $("btn-start-session").onclick = startDailyPlan;
+  $("btn-words-study").onclick = () => { dayPlan.active = false; startSession(); };
   $("btn-add-word").onclick = () => {
     ["aw-en", "aw-ru", "aw-ex", "aw-exr"].forEach(id => { $(id).value = ""; });
     $("aw-err").classList.add("hidden");
