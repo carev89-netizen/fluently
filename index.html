@@ -338,6 +338,36 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-off
 .wordpop .btn{width:100%}
 .planhint{font-size:.78rem;color:var(--ink2);text-align:center;line-height:1.45;margin-top:-4px}
 
+/* ============ Чек-лист занятия дня ============ */
+.checklist{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);
+  padding:14px;display:flex;flex-direction:column;gap:8px;text-align:left;margin-top:0}
+.clhdr{display:flex;align-items:baseline;justify-content:space-between;
+  font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink3)}
+.clcount{font-size:1rem;font-weight:800;color:var(--ink2);font-variant-numeric:tabular-nums;letter-spacing:0}
+.clcount.ok{color:var(--good)}
+.clitem{display:flex;align-items:center;gap:11px;width:100%;text-align:left;
+  background:var(--surface2);border-radius:12px;padding:10px 12px;transition:background .15s ease}
+.clitem.ok{background:var(--good-soft)}
+.clitem:active{transform:scale(.99)}
+.clbox{width:30px;height:30px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;
+  justify-content:center;font-size:1rem;background:var(--surface);color:var(--ink2);box-shadow:var(--shadow)}
+.clitem.ok .clbox{background:var(--good);color:#fff;font-weight:800;box-shadow:none}
+.clgrow{flex:1;min-width:0}
+.cllabel{display:block;font-weight:700;font-size:.92rem}
+.clitem.ok .cllabel{color:var(--good)}
+.clhint{display:block;font-size:.74rem;color:var(--ink2);margin-top:1px}
+.clitem .arr{color:var(--ink3);flex-shrink:0}
+.clnote{font-size:.72rem;color:var(--ink3);line-height:1.4;text-align:center;padding-top:2px}
+.cldone{font-size:.8rem;color:var(--good);line-height:1.45;text-align:center;font-weight:600}
+
+/* Полоса статуса на экранах завершения */
+.planstrip{background:var(--surface);border-radius:14px;box-shadow:var(--shadow);padding:12px;margin-bottom:12px}
+.psrow{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:8px}
+.pschip{background:var(--surface2);color:var(--ink2);border-radius:999px;
+  padding:5px 10px;font-size:.74rem;font-weight:650}
+.pschip.ok{background:var(--good-soft);color:var(--good)}
+.pstext{text-align:center;font-size:.85rem;color:var(--ink2)}
+
 /* ============ Прогресс ============ */
 .cardhdr{font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px}
 .metric{margin-bottom:15px}
@@ -5178,12 +5208,50 @@ const AREA_ADVICE = {
 };
 
 /* ---------------- Занятие дня: карточки → аудирование → говорение ---------------- */
-const BASE_STEPS = [
-  { icon: "🗂️", label: "Карточки", run: () => startSession() },
-  { icon: "🎧", label: "Аудирование", run: () => startListening(suggestedLevel()) },
-  { icon: "🎙️", label: "Говорить", run: () => startRoleplay(nextScenario()) }
+/* Четыре блока занятия. Блок засчитывается за ЛЮБУЮ завершённую тренировку
+   своего типа — неважно, зашёл ли ученик через «Начать занятие» или из меню. */
+const PLAN_TASKS = [
+  { key: "cards",  icon: "🗂️", label: "Слова",       hint: "Повторить карточки",              run: () => startSession() },
+  { key: "listen", icon: "🎧", label: "Слух",         hint: "Аудирование, диктант или беглая речь", run: () => startListening(suggestedLevel()) },
+  { key: "speak",  icon: "🎙️", label: "Речь",         hint: "Ролевой диалог голосом",           run: () => startRoleplay(nextScenario()) },
+  { key: "bonus",  icon: "⭐", label: "Бонус",        hint: "Грамматика или чтение",            run: () => bonusRun() }
 ];
 const dayPlan = { active: false };
+
+function bonusRun() {
+  const a = analyze();
+  const ex = extraStep(a);
+  if (ex && ex.area === "grammar") return ex.run();
+  if (ex && ex.area === "words") return startHardWords();
+  // по умолчанию — текст на чтение
+  const unread = READING.filter(t => levelIndex(t.lvl) <= levelIndex(currentLevel()) && !readingProgress(t));
+  if (unread.length) return openText(unread[0].id);
+  show("scr-reading");
+}
+
+function planState() {
+  const p = store.data.plan;
+  if (p.date !== todayStr()) { p.date = todayStr(); p.done = {}; store.save(); }
+  if (!p.done) { p.done = {}; store.save(); }
+  return p;
+}
+/* Отметить блок пройденным. Вызывается в конце каждой тренировки. */
+function markPlanDone(key) {
+  const p = planState();
+  if (p.done[key]) return false;
+  p.done[key] = true;
+  store.save();
+  return true;
+}
+function planDoneCount() {
+  const p = planState();
+  return PLAN_TASKS.filter(t => p.done[t.key]).length;
+}
+function planAllDone() { return planDoneCount() >= PLAN_TASKS.length; }
+function planNext() {
+  const p = planState();
+  return PLAN_TASKS.filter(t => !p.done[t.key])[0] || null;
+}
 
 /* Четвёртый шаг подбирается под то, что проседает */
 function extraStep(a) {
@@ -5199,16 +5267,8 @@ function extraStep(a) {
     return { icon: "🔁", label: "Трудные слова", why: a.words.hard.length + " слов буксуют", run: () => startHardWords() };
   return null;
 }
-function planSteps() {
-  const ex = extraStep(analyze());
-  return ex ? BASE_STEPS.concat([ex]) : BASE_STEPS.slice();
-}
 
-function planState() {
-  const p = store.data.plan;
-  if (p.date !== todayStr()) { p.date = todayStr(); p.step = 0; store.save(); }
-  return p;
-}
+
 function suggestedLevel() {
   const l = store.data.listening;
   if (l.l2 && l.l2.best >= 8) return 3;
@@ -5221,39 +5281,41 @@ function nextScenario() {
 }
 function startDailyPlan() {
   dayPlan.active = true;
-  dayPlan.steps = planSteps(); // фиксируем состав на время занятия
-  runPlanStep();
+  const nx = planNext();
+  if (!nx) { show("scr-home"); return; }
+  nx.run();
 }
-function runPlanStep() {
-  const p = planState();
-  const steps = dayPlan.steps || planSteps();
-  if (p.step >= steps.length) { dayPlan.active = false; show("scr-home"); return; }
-  steps[p.step].run();
-}
-/* Кнопки в конце этапа: ведём дальше по плану либо отдаём обычные кнопки */
-function planDoneButtons(box, fallback) {
-  if (!dayPlan.active) { fallback.forEach(b => box.appendChild(b)); return; }
-  const p = planState();
-  const steps = dayPlan.steps || planSteps();
-  p.step++;
-  store.save();
-  if (p.step >= steps.length) {
+
+/* Экран завершения тренировки: отмечаем блок и показываем, где мы в занятии дня.
+   taskKey — какой блок закрыт этой тренировкой. */
+function planDoneButtons(box, fallback, taskKey) {
+  if (taskKey) markPlanDone(taskKey);
+  const done = planDoneCount(), total = PLAN_TASKS.length;
+
+  if (taskKey) {
+    const strip = el("div", "planstrip");
+    strip.innerHTML = "<div class='psrow'>" +
+      PLAN_TASKS.map(t => {
+        const ok = planState().done[t.key];
+        return "<span class='pschip " + (ok ? "ok" : "") + "'>" + (ok ? "✓" : t.icon) + " " + esc(t.label) + "</span>";
+      }).join("") + "</div>" +
+      "<div class='pstext'>" + (planAllDone()
+        ? "🏆 Занятие дня выполнено полностью!"
+        : "Занятие дня: <b>" + done + " из " + total + "</b>") + "</div>";
+    box.appendChild(strip);
+  }
+
+  if (planAllDone() || !taskKey) {
+    fallback.forEach(b => box.appendChild(b));
     dayPlan.active = false;
-    box.appendChild(el("div", "feedback ok", "🏆 Занятие дня выполнено — все шаги пройдены. Так держать!"));
-    const b = el("button", "btn", "На главную");
-    b.onclick = () => show("scr-home");
-    box.appendChild(b);
     return;
   }
-  const nx = steps[p.step];
-  box.appendChild(el("div", "chip acc", "шаг " + p.step + " из " + steps.length + " пройден"));
+  const nx = planNext();
   const b = el("button", "btn", "Дальше: " + nx.icon + " " + nx.label);
-  b.onclick = () => runPlanStep();
+  b.onclick = () => { dayPlan.active = true; nx.run(); };
   box.appendChild(b);
-  if (nx.why) box.appendChild(el("div", "planhint", "Добавлено к плану: " + nx.why));
-  const stop = el("button", "btn ghost small", "Закончить занятие");
-  stop.onclick = () => { dayPlan.active = false; show("scr-home"); };
-  box.appendChild(stop);
+  box.appendChild(el("div", "planhint", esc(nx.hint)));
+  fallback.forEach(f => { f.className = "btn ghost small"; box.appendChild(f); });
 }
 
 /* Сессия только из «буксующих» слов */
@@ -5321,23 +5383,43 @@ function renderHome() {
   $("st-learned").textContent = learnedCount();
   $("st-today").textContent = store.data.days[todayStr()] || 0;
   $("home-words-d").textContent = startedCount() + " из " + WORDS.length + " слов в работе";
-  // Занятие дня (состав подстраивается под слабое место)
+  // Занятие дня — крупный чек-лист: видно сразу, что сделано и что осталось
   const an = analyze();
-  const steps = planSteps();
   const p = planState();
+  const doneN = planDoneCount(), totalN = PLAN_TASKS.length;
+  const allDone = planAllDone();
+  const ex = extraStep(an);
+
   const btn = $("btn-start-session");
-  if (p.step >= steps.length) {
-    btn.innerHTML = "✓&nbsp; Занятие сегодня выполнено";
-    btn.classList.add("soft");
-    $("plan-hint").textContent = "Можно пройти ещё раз — или просто повторить карточки.";
-  } else {
-    const nx = steps[p.step];
-    btn.classList.remove("soft");
-    btn.innerHTML = "▶︎&nbsp; " + (p.step === 0 ? "Начать занятие" : "Продолжить занятие");
-    $("plan-hint").innerHTML = steps.map((s, i) =>
-      (i < p.step ? "✓ " : "") + s.icon + " " + esc(s.label)).join("  ·  ") +
-      "<br>дальше — " + esc(nx.label.toLowerCase()) + (nx.why ? " <b>(" + esc(nx.why) + ")</b>" : "");
-  }
+  const nx = planNext();
+  btn.classList.toggle("soft", allDone);
+  btn.innerHTML = allDone
+    ? "✓&nbsp; Занятие дня выполнено"
+    : (doneN === 0 ? "▶︎&nbsp; Начать занятие" : "▶︎&nbsp; Продолжить: " + nx.icon + " " + esc(nx.label));
+
+  const cl = $("plan-hint");
+  cl.className = "checklist";
+  cl.innerHTML =
+    "<div class='clhdr'><span>Занятие дня</span><span class='clcount " + (allDone ? "ok" : "") + "'>" +
+      doneN + " / " + totalN + "</span></div>" +
+    PLAN_TASKS.map(t => {
+      const ok = !!p.done[t.key];
+      const why = (t.key === "bonus" && ex && !ok) ? ex.label : t.hint;
+      return "<button class='clitem " + (ok ? "ok" : "") + "' data-task='" + t.key + "'>" +
+        "<span class='clbox'>" + (ok ? "✓" : t.icon) + "</span>" +
+        "<span class='clgrow'><span class='cllabel'>" + esc(t.label) + "</span>" +
+        "<span class='clhint'>" + esc(ok ? "готово" : why) + "</span></span>" +
+        (ok ? "" : "<span class='arr'>›</span>") + "</button>";
+    }).join("") +
+    (allDone
+      ? "<div class='cldone'>🏆 Всё сделано на сегодня. Можно пройти что-то ещё раз — прогресс всё равно засчитается.</div>"
+      : "<div class='clnote'>Блок засчитывается за любую завершённую тренировку — неважно, откуда ты в неё зашёл.</div>");
+  cl.querySelectorAll("[data-task]").forEach(b =>
+    b.addEventListener("click", () => {
+      const t = PLAN_TASKS.filter(x => x.key === b.dataset.task)[0];
+      dayPlan.active = true;
+      t.run();
+    }));
   document.querySelectorAll("[data-accent]").forEach(b =>
     b.classList.toggle("on", b.dataset.accent === (store.data.settings.accent || "US")));
   $("accent-hint").textContent = tts.hasBoth()
@@ -5572,7 +5654,7 @@ function startSession() {
       "<div class='big'>🎉</div><h3>На сегодня всё!</h3><p>Все карточки повторены. Возвращайся завтра — или добавь новых слов в настройках.</p>");
     const back = el("button", "btn", "На главную");
     back.onclick = () => show("scr-home");
-    planDoneButtons(d, [back]);
+    planDoneButtons(d, [back], "cards");
     $("sess-card").appendChild(d);
     return;
   }
@@ -5605,7 +5687,7 @@ function nextCard() {
       "<div class='big'>💪</div><h3>Сессия завершена</h3><p>Карточек пройдено: " + session.done + ". Отличная работа!</p>");
     const b = el("button", "btn", "На главную");
     b.onclick = () => show("scr-home");
-    planDoneButtons(d, [b]);
+    planDoneButtons(d, [b], "cards");
     $("sess-card").appendChild(d);
     return;
   }
@@ -5774,7 +5856,7 @@ function renderGexQuestion() {
     again.onclick = () => startGex(gex.topic);
     const back = el("button", "btn", "К темам");
     back.onclick = () => show("scr-grammar");
-    d.appendChild(again); d.appendChild(back);
+    planDoneButtons(d, [again, back], "bonus");
     box.appendChild(d);
     return;
   }
@@ -5888,7 +5970,7 @@ function renderLsess() {
     again.onclick = () => { dayPlan.active = false; startListening(lsess.level); };
     const back = el("button", "btn", "К уровням");
     back.onclick = () => show("scr-listen");
-    planDoneButtons(d, [again, back]);
+    planDoneButtons(d, [again, back], "listen");
     box.appendChild(d);
     return;
   }
@@ -5974,7 +6056,7 @@ function renderDict() {
     again.onclick = () => { dayPlan.active = false; startDictation(dict.level); };
     const back = el("button", "btn", "К аудированию");
     back.onclick = () => show("scr-listen");
-    planDoneButtons(d, [again, back]);
+    planDoneButtons(d, [again, back], "listen");
     box.appendChild(d);
     return;
   }
@@ -6193,7 +6275,7 @@ function renderReadQuestion() {
     again.onclick = () => openText(t.id);
     const back = el("button", "btn", "К текстам");
     back.onclick = () => show("scr-reading");
-    planDoneButtons(d, [again, back]);
+    planDoneButtons(d, [again, back], "bonus");
     box.appendChild(d);
     return;
   }
@@ -6261,7 +6343,7 @@ function renderReduction() {
     again.onclick = () => { dayPlan.active = false; startReductions(); };
     const back = el("button", "btn", "К аудированию");
     back.onclick = () => show("scr-listen");
-    planDoneButtons(d, [again, back]);
+    planDoneButtons(d, [again, back], "listen");
     box.appendChild(d);
     return;
   }
@@ -6797,7 +6879,7 @@ function renderRstep() {
     again.onclick = () => { dayPlan.active = false; startRoleplay(rsess.sc); };
     const back = el("button", "btn", "К сценариям");
     back.onclick = () => show("scr-speak");
-    planDoneButtons(d, [again, back]);
+    planDoneButtons(d, [again, back], "speak");
     box.appendChild(d);
     return;
   }
