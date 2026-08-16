@@ -338,6 +338,32 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-off
 .wordpop .btn{width:100%}
 .planhint{font-size:.78rem;color:var(--ink2);text-align:center;line-height:1.45;margin-top:-4px}
 
+/* ============ Шпаргалка с правилом ============ */
+.rulebtn{
+  flex-shrink:0;background:var(--accent-soft);color:var(--accent);
+  border-radius:999px;padding:7px 12px;font-size:.76rem;font-weight:700;white-space:nowrap;
+}
+.rulebtn:active{transform:scale(.96)}
+.sheet-back{position:fixed;inset:0;z-index:70;background:rgba(10,14,25,.5);animation:fadein .18s ease}
+.sheet{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:0;z-index:71;
+  width:min(520px,100%);max-height:78vh;
+  background:var(--surface);border-radius:22px 22px 0 0;
+  box-shadow:0 -10px 40px rgba(0,0,0,.28);
+  display:flex;flex-direction:column;
+  padding-bottom:env(safe-area-inset-bottom);
+  animation:sheetup .26s cubic-bezier(.2,.8,.2,1);
+}
+@keyframes sheetup{from{transform:translate(-50%,100%)}to{transform:translate(-50%,0)}}
+.sheet-grip{width:38px;height:4px;border-radius:2px;background:var(--line);margin:9px auto 4px}
+.sheet-head{display:flex;align-items:center;gap:10px;padding:6px 18px 10px;border-bottom:1px solid var(--line)}
+.sheet-head h3{flex:1;font-size:1.02rem;letter-spacing:-.01em;text-wrap:balance}
+.sheet-x{width:32px;height:32px;border-radius:50%;background:var(--surface2);color:var(--ink2);
+  display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0}
+.sheet-body{overflow-y:auto;padding:14px 18px 20px;-webkit-overflow-scrolling:touch}
+.sheet-body p{font-size:.95rem;line-height:1.6;margin-bottom:10px}
+.sheet-body .callout{margin-top:12px}
+
 /* ============ Чек-лист занятия дня ============ */
 .checklist{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);
   padding:14px;display:flex;flex-direction:column;gap:8px;text-align:left;margin-top:0}
@@ -633,6 +659,7 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-off
     <div class="subhead">
       <button class="backbtn" id="gex-back" aria-label="Назад">‹</button>
       <h2 id="gex-title"></h2>
+      <button class="rulebtn" id="gex-rule" aria-label="Показать правило">📖 Правило</button>
       <span class="chip" id="gex-count"></span>
     </div>
     <div class="row" style="margin-bottom:14px"><div class="pbar"><div id="gex-bar" style="width:0%"></div></div></div>
@@ -707,6 +734,16 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-off
     </div>
   </section>
 
+  <!-- Шпаргалка с правилом поверх упражнений -->
+  <div class="sheet-back hidden" id="rule-back"></div>
+  <div class="sheet hidden" id="rule-sheet" role="dialog" aria-label="Правило">
+    <div class="sheet-grip"></div>
+    <div class="sheet-head">
+      <h3 id="rule-title"></h3>
+      <button class="sheet-x" id="rule-close" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="sheet-body" id="rule-body"></div>
+  </div>
 </div>
 
 <nav id="tabbar" aria-label="Разделы">
@@ -5032,6 +5069,7 @@ function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").
 const MAIN_TABS = ["scr-home", "scr-words", "scr-grammar", "scr-listen", "scr-phrases"];
 function show(id) {
   tts.stop();
+  const rs = $("rule-sheet"); if (rs && !rs.classList.contains("hidden")) closeRuleSheet();
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
   $(id).classList.add("active");
   document.querySelectorAll("#tabbar button").forEach(b => b.classList.toggle("on", b.dataset.tab === id));
@@ -5827,6 +5865,24 @@ function openGrammarTopic(i) {
   show("scr-gtopic");
 }
 
+/* Шпаргалка: правило поверх упражнений, прогресс не теряется */
+function openRuleSheet(topicIdx) {
+  const g = ALL_GRAMMAR[topicIdx];
+  $("rule-title").textContent = g.title;
+  const body = $("rule-body");
+  body.innerHTML = "";
+  g.theory.forEach(p => body.appendChild(el("p", "", esc(p))));
+  body.appendChild(el("div", "callout",
+    "<div class='ct'>⚠️ Типичная ошибка русскоговорящих</div>" + esc(g.mistake)));
+  $("rule-back").classList.remove("hidden");
+  $("rule-sheet").classList.remove("hidden");
+  body.scrollTop = 0;
+}
+function closeRuleSheet() {
+  $("rule-back").classList.add("hidden");
+  $("rule-sheet").classList.add("hidden");
+}
+
 const gex = { idx: 0, correct: 0, topic: 0 };
 function startGex(topicIdx) {
   gex.topic = topicIdx; gex.idx = 0; gex.correct = 0;
@@ -5883,6 +5939,11 @@ function answerGex(oi, btn, optsBox, q, stack) {
   const fb = el("div", "feedback " + (ok ? "ok" : "no"),
     (ok ? "✓ Верно. " : "✗ Правильно: «" + esc(q.options[q.answer]) + "». ") + esc(q.explain));
   stack.appendChild(fb);
+  if (!ok) {
+    const rule = el("button", "btn soft small", "📖 Перечитать правило");
+    rule.onclick = () => openRuleSheet(gex.topic);
+    stack.appendChild(rule);
+  }
   const next = el("button", "btn", gex.idx + 1 >= ALL_GRAMMAR[gex.topic].exercises.length ? "Результат" : "Дальше");
   next.onclick = () => { gex.idx++; renderGexQuestion(); };
   stack.appendChild(next);
@@ -7158,6 +7219,9 @@ function init() {
     $("aw-en").focus();
   };
   $("gex-back").onclick = () => openGrammarTopic(gex.topic);
+  $("gex-rule").onclick = () => openRuleSheet(gex.topic);
+  $("rule-close").onclick = closeRuleSheet;
+  $("rule-back").onclick = closeRuleSheet;
 
   $("new-minus").onclick = () => { const s = store.data.settings; s.newPerDay = Math.max(0, s.newPerDay - 5); store.save(); renderHome(); };
   $("new-plus").onclick = () => { const s = store.data.settings; s.newPerDay = Math.min(50, s.newPerDay + 5); store.save(); renderHome(); };
