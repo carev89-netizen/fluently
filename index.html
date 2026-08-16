@@ -325,6 +325,17 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-off
 .michint{text-align:center;font-size:.78rem;color:var(--ink2);line-height:1.45;padding:0 10px}
 .livebox{background:var(--surface2);border-radius:12px;padding:11px 14px;font-size:.95rem;
   font-family:ui-serif,"New York",Georgia,serif;color:var(--ink);min-height:44px;line-height:1.45}
+.article p{font-size:1.06rem;line-height:1.72;margin-bottom:14px;text-wrap:pretty}
+.article p:last-child{margin-bottom:0}
+.tapw{cursor:pointer;border-radius:4px;transition:background .12s ease}
+.tapw:active,.tapw:hover{background:var(--accent-soft)}
+.wordpop{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:calc(78px + env(safe-area-inset-bottom));
+  width:min(480px,calc(100% - 24px));z-index:60;
+  background:var(--surface);border-radius:16px;box-shadow:var(--shadow-lg);
+  padding:14px;display:flex;flex-direction:column;gap:10px;animation:pop .22s ease;
+}
+.wordpop .btn{width:100%}
 .planhint{font-size:.78rem;color:var(--ink2);text-align:center;line-height:1.45;margin-top:-4px}
 
 /* ============ Прогресс ============ */
@@ -390,6 +401,7 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-off
       <button class="listrow" data-nav="scr-listen"><span class="ic">🎧</span><span><span class="t">Аудирование</span><br><span class="d">Слушай и выбирай, что услышал</span></span><span class="arr">›</span></button>
       <button class="listrow" data-nav="scr-phrases"><span class="ic">💬</span><span><span class="t">Фразы и диалоги</span><br><span class="d">Разговорник с озвучкой</span></span><span class="arr">›</span></button>
       <button class="listrow" data-nav="scr-speak"><span class="ic">🎙️</span><span><span class="t">Говорить</span><br><span class="d">Ролевые диалоги: отвечай голосом</span></span><span class="arr">›</span></button>
+      <button class="listrow" data-nav="scr-reading"><span class="ic">📖</span><span class="grow"><span class="t">Чтение</span><br><span class="d" id="home-reading-d">Тексты с тапом по словам</span></span><span class="arr">›</span></button>
       <div class="sethdr">Настройки</div>
       <div class="setrow">
         <span class="t">Новых слов в день</span>
@@ -414,6 +426,16 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-off
         <span class="t">Уровень</span>
         <span class="seg" id="level-seg" style="min-width:200px"></span>
       </div>
+      <div class="setrow">
+        <span class="t">Акцент озвучки</span>
+        <span class="seg" style="min-width:150px">
+          <button data-accent="US">🇺🇸 US</button>
+          <button data-accent="GB">🇬🇧 UK</button>
+        </span>
+      </div>
+      <div class="planhint" id="accent-hint"></div>
+      <button class="btn ghost" id="btn-vocabtest">📏&nbsp; Узнать свой словарный запас</button>
+      <div class="planhint" id="vt-hint"></div>
       <div class="sethdr">Резервная копия</div>
       <div class="card">
         <div class="mnote" style="margin-top:0">Прогресс хранится только в этом браузере. Сохрани копию — и его можно будет вернуть на другом телефоне.</div>
@@ -438,6 +460,55 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-off
       <div class="sethdr">Темы словаря</div>
       <div class="themegrid" id="themes-grid"></div>
     </div>
+  </section>
+
+  <!-- ЧТЕНИЕ -->
+  <section class="screen" id="scr-reading">
+    <div class="apphead"><div><h1>Чтение</h1><div class="sub">Тексты с тапом по словам</div></div></div>
+    <div class="stack" id="reading-list"></div>
+  </section>
+
+  <!-- Текст -->
+  <section class="screen" id="scr-read">
+    <div class="subhead">
+      <button class="backbtn" data-nav="scr-reading" aria-label="Назад">‹</button>
+      <h2 id="read-title"></h2>
+    </div>
+    <div class="stack" id="read-body"></div>
+    <div class="wordpop hidden" id="word-pop"></div>
+  </section>
+
+  <!-- Вопросы по тексту -->
+  <section class="screen" id="scr-readq">
+    <div class="subhead">
+      <button class="backbtn" data-nav="scr-reading" aria-label="Назад">‹</button>
+      <h2 id="rq-title"></h2>
+      <span class="chip" id="rq-count"></span>
+    </div>
+    <div class="row" style="margin-bottom:14px"><div class="pbar"><div id="rq-bar" style="width:0%"></div></div></div>
+    <div id="rq-body"></div>
+  </section>
+
+  <!-- Американские редукции -->
+  <section class="screen" id="scr-reduction">
+    <div class="subhead">
+      <button class="backbtn" data-nav="scr-listen" aria-label="Назад">‹</button>
+      <h2>🇺🇸 Беглая речь</h2>
+      <span class="chip" id="red-count"></span>
+    </div>
+    <div class="row" style="margin-bottom:14px"><div class="pbar"><div id="red-bar" style="width:0%"></div></div></div>
+    <div id="red-body"></div>
+  </section>
+
+  <!-- Тест на объём словаря -->
+  <section class="screen" id="scr-vocabtest">
+    <div class="subhead">
+      <button class="backbtn" data-nav="scr-home" aria-label="Назад">‹</button>
+      <h2>Сколько я знаю слов</h2>
+      <span class="chip" id="vt-count"></span>
+    </div>
+    <div class="row" style="margin-bottom:14px"><div class="pbar"><div id="vt-bar" style="width:0%"></div></div></div>
+    <div id="vt-body"></div>
   </section>
 
   <!-- Диктант -->
@@ -615,7 +686,7 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-off
     <button data-tab="scr-grammar"><span class="ic">📐</span>Грамматика</button>
     <button data-tab="scr-listen"><span class="ic">🎧</span>Слушать</button>
     <button data-tab="scr-speak"><span class="ic">🎙️</span>Говорить</button>
-    <button data-tab="scr-phrases"><span class="ic">💬</span>Фразы</button>
+    <button data-tab="scr-reading"><span class="ic">📖</span>Чтение</button>
   </div>
 </nav>
 <script>
@@ -4484,6 +4555,233 @@ const ROLEPLAY = [
      keys:["thank","help","advice"]}
   ]}
 ];
+const READING = [
+{
+  id: "t01", lvl: "B1", mins: 2,
+  title: "The Man Who Delivered Nothing",
+  ru_title: "Человек, который ничего не доставлял",
+  text: "For eleven years, Jan Sloot worked as a television repairman in a small Dutch town. He was not a scientist. He had no degree in mathematics. But in 1995 he claimed he had invented something remarkable: a way to compress a full-length film into just eight kilobytes of data.\n\nExperts said it was impossible. You cannot squeeze two hours of moving pictures into a file smaller than a single photograph. Yet Sloot gave demonstrations. Investors watched sixteen different films play from one small chip. One of them was so convinced that he agreed to buy the technology for a large sum.\n\nThe contract was due to be signed on 11 September 1999. Two days before that date, Sloot died of a heart attack in his garden. The key to his system — a single floppy disk — was never found. His source code disappeared with him.\n\nEngineers who examined his work afterwards were divided. Some argued the whole thing was an elaborate trick, and that the films had been stored on the machine all along. Others pointed out that Sloot had nothing to gain from deceiving people he had known for years, and that he had refused easy money more than once.\n\nWe will probably never know. What makes the story last is not the technology but the timing: a man who spent a decade on one idea, and died on the week it was meant to change his life.",
+  glossary: {
+    "repairman": "мастер по ремонту", "degree": "учёная степень, диплом", "claimed": "утверждал",
+    "remarkable": "поразительный, замечательный", "compress": "сжимать", "squeeze": "втиснуть, сжать",
+    "demonstrations": "показы, демонстрации", "convinced": "убеждённый", "sum": "сумма",
+    "due": "должен был (по плану)", "elaborate": "изощрённый, продуманный", "trick": "уловка, трюк",
+    "argued": "утверждали, доказывали", "deceiving": "обманывать", "refused": "отказался",
+    "timing": "момент, стечение времени"
+  },
+  questions: [
+    { q: "What was Sloot's profession?", options: ["A university mathematician", "A television repairman", "A software investor"], answer: 1, explain: "В первом абзаце: he worked as a television repairman." },
+    { q: "Why did experts doubt his invention?", options: ["He refused to give demonstrations", "He had died before showing it", "The claimed compression seemed physically impossible"], answer: 2, explain: "Experts said it was impossible — нельзя сжать фильм до размера меньше фотографии." },
+    { q: "What does the last paragraph suggest the author finds most striking?", options: ["The coincidence of his death and the contract date", "The proof that the technology was fake", "The amount of money involved"], answer: 0, explain: "«What makes the story last is not the technology but the timing» — поражает совпадение по времени." }
+  ]
+},
+{
+  id: "t02", lvl: "B1", mins: 2,
+  title: "Why Meetings Get Longer",
+  ru_title: "Почему совещания становятся длиннее",
+  text: "Most people complain about meetings, yet most people also keep scheduling them. Researchers who study workplace behaviour have noticed a simple pattern: a meeting expands to fill whatever time has been booked for it.\n\nIf you reserve an hour to discuss one decision, the discussion will take an hour. If you reserve twenty minutes for the same decision, it will usually take twenty minutes, and the outcome will rarely be worse. The extra forty minutes are not spent on better thinking. They are spent on repetition, on politeness, and on people who feel they should say something because they were invited.\n\nThere is a second pattern. The larger the group, the less each individual contributes. In a meeting of four, everyone speaks. In a meeting of twelve, three or four people speak and the rest listen, check their phones, and wait. Yet the twelve-person meeting costs three times as much in salary.\n\nSome companies have responded with strict rules. One well-known approach is to invite nobody who is not required to make the decision, and to cancel any meeting whose purpose cannot be written in a single sentence. Another is to begin with silence: everyone reads the proposal in the room, for ten minutes, before anyone is allowed to comment.\n\nThe rules sound rigid, but they solve a real problem. A meeting is the most expensive tool a company owns, and it is usually the one nobody measures.",
+  glossary: {
+    "complain": "жаловаться", "scheduling": "назначать, планировать", "expands": "расширяется",
+    "booked": "забронировано, отведено", "reserve": "отводить, резервировать", "outcome": "результат, исход",
+    "repetition": "повторение", "politeness": "вежливость", "contributes": "вносит вклад",
+    "salary": "зарплата", "responded": "отреагировали", "strict": "строгий", "required": "необходим, требуется",
+    "purpose": "цель", "proposal": "предложение", "rigid": "жёсткий, негибкий", "measures": "измеряет"
+  },
+  questions: [
+    { q: "According to the text, what happens if you book an hour for a short decision?", options: ["The decision improves noticeably", "The discussion stretches to fill the hour", "People leave early"], answer: 1, explain: "«A meeting expands to fill whatever time has been booked for it»." },
+    { q: "What happens in larger meetings?", options: ["Fewer people speak, but the cost rises", "Everyone contributes more", "Decisions are made faster"], answer: 0, explain: "В группе из двенадцати говорят трое-четверо, а стоимость втрое выше." },
+    { q: "What is the author's view of the strict rules?", options: ["They are unnecessary bureaucracy", "They sound harsh but address a genuine problem", "They only work in large companies"], answer: 1, explain: "«The rules sound rigid, but they solve a real problem»." }
+  ]
+},
+{
+  id: "t03", lvl: "B1", mins: 2,
+  title: "The Language You Dream In",
+  ru_title: "Язык, на котором вы видите сны",
+  text: "People who learn a second language as adults often report a strange moment: the first time they dream in it. It usually happens after a period of immersion — a few weeks abroad, or an intense course — and it is often taken as proof that the language has finally gone deep.\n\nLinguists are more cautious. Dreaming in a language does not mean you have mastered it. Sleep researchers point out that dreams borrow whatever material the brain has been handling recently. If you have spent three weeks hearing Spanish in shops and on the street, Spanish will appear in your dreams whether or not you speak it well. Some people report dreams in languages they barely know, full of sentences that mean nothing.\n\nWhat does seem to matter is emotion. Studies of bilingual speakers suggest that people usually swear, count, and pray in their first language, even after decades abroad. Arithmetic and strong feelings stay attached to the language in which they were first learned. A woman who has lived in London for thirty years may run a company in English and still add up numbers in Polish.\n\nThis is why speaking a foreign language can feel oddly distant. Researchers have found that people make more rational, less emotional decisions when thinking in a second language. Bad news hurts slightly less. Risk feels slightly smaller.\n\nFor a learner, the practical lesson is simple. Do not wait for the dream. Wait for the moment when you argue in the language — because argument, unlike vocabulary, cannot be rehearsed.",
+  glossary: {
+    "immersion": "погружение в среду", "intense": "интенсивный", "proof": "доказательство",
+    "cautious": "осторожный", "mastered": "освоил в совершенстве", "borrow": "заимствовать",
+    "handling": "обрабатывать, иметь дело с", "barely": "едва", "swear": "ругаться",
+    "pray": "молиться", "decades": "десятилетия", "arithmetic": "арифметика, счёт",
+    "attached": "привязанный", "distant": "отстранённый, далёкий", "rational": "рациональный",
+    "rehearsed": "отрепетирован"
+  },
+  questions: [
+    { q: "Why are linguists cautious about dreaming in a language?", options: ["Dreams reflect recent exposure, not real skill", "Dreams cannot be studied at all", "Only children dream in second languages"], answer: 0, explain: "Мозг использует свежий материал — язык появится во сне независимо от уровня." },
+    { q: "What do bilingual speakers tend to keep in their first language?", options: ["Reading and writing", "Formal and professional vocabulary", "Counting, swearing and praying"], answer: 2, explain: "«People usually swear, count, and pray in their first language»." },
+    { q: "What sign of progress does the author recommend watching for?", options: ["Dreaming in the language", "Arguing in the language", "Counting in the language"], answer: 1, explain: "Спор нельзя отрепетировать — поэтому он и есть настоящий признак." }
+  ]
+},
+{
+  id: "t04", lvl: "B2", mins: 3,
+  title: "The Cost of Being Always Available",
+  ru_title: "Цена постоянной доступности",
+  text: "In 2017, France introduced a law that gave employees the right to disconnect. Companies with more than fifty staff were required to negotiate rules about email outside working hours. The law was widely mocked in the English-speaking press, which treated it as another example of French reluctance to work. Several years later, similar rules have appeared in Spain, Belgium, Portugal and parts of Canada.\n\nThe argument behind such laws is not that email is harmful in itself. It is that availability has no natural limit. Before mobile phones, the working day ended when you left the building. The boundary was physical and therefore obvious. Once work follows you home in your pocket, the only boundary left is the one you negotiate, and most employees have very little power to negotiate anything.\n\nResearch on the subject has produced a counter-intuitive finding. It is not the volume of after-hours email that damages wellbeing most, but the expectation of it. Employees who never actually receive evening messages, yet believe they might, report levels of anxiety comparable to those who genuinely work late. The mind does not switch off while it is waiting.\n\nManagers often resist formal rules on the grounds that flexibility cuts both ways: if I can email you at nine in the evening, you can take an afternoon off for your child's school play. That argument has some force, but it assumes an equality of power that rarely exists. The manager sets the culture; the employee reads it and adapts.\n\nWhat the successful policies have in common is modest ambition. None of them ban evening email outright. They simply require that expectations be stated: whether a reply is needed before morning, and who decides. Written down, an assumption becomes negotiable. Left unspoken, it quietly becomes a rule.",
+  glossary: {
+    "disconnect": "отключаться", "negotiate": "договариваться, обсуждать", "mocked": "высмеян",
+    "reluctance": "нежелание", "availability": "доступность", "boundary": "граница",
+    "counter-intuitive": "противоречащий здравому смыслу", "wellbeing": "самочувствие, благополучие",
+    "expectation": "ожидание", "anxiety": "тревога", "comparable": "сопоставимый", "resist": "сопротивляться",
+    "grounds": "основания", "flexibility": "гибкость", "assumes": "предполагает", "equality": "равенство",
+    "adapts": "приспосабливается", "modest": "скромный", "outright": "прямо, полностью",
+    "assumption": "допущение, негласное ожидание", "unspoken": "невысказанный"
+  },
+  questions: [
+    { q: "What does the research say is most damaging?", options: ["The number of evening emails received", "The expectation that emails might arrive", "The length of the emails"], answer: 1, explain: "«Not the volume of after-hours email … but the expectation of it»." },
+    { q: "Why does the author question the managers' flexibility argument?", options: ["Because flexibility is illegal in France", "Because employees rarely want afternoons off", "Because it assumes an equality of power that usually does not exist"], answer: 2, explain: "Руководитель задаёт культуру, сотрудник под неё подстраивается." },
+    { q: "What do the successful policies actually do?", options: ["Ban all evening communication", "Require expectations to be made explicit", "Punish managers who write at night"], answer: 1, explain: "Они не запрещают письма, а требуют проговорить ожидания вслух." }
+  ]
+},
+{
+  id: "t05", lvl: "B2", mins: 3,
+  title: "How the Map Changed the Territory",
+  ru_title: "Как карта изменила местность",
+  text: "The London Underground map that hangs in every station is not a map. It is a diagram. Distances on it are wrong, angles are wrong, and the River Thames is drawn as a neat geometric shape it has never resembled. It was designed in 1931 by Harry Beck, an engineering draughtsman who was temporarily out of work, and who reasoned that passengers underground do not care where they are — only where they change trains.\n\nBeck's employers rejected the idea at first as too radical. When they finally printed a small trial run in 1933, it sold out within days. The design has since been copied by transit systems from Sydney to Moscow, and it has become one of the most recognisable pieces of graphic design ever produced.\n\nWhat is less often discussed is the effect it had on London itself. Because the diagram spaces out central stations and compresses outer ones, it makes distant suburbs look far closer to the centre than they are. Property researchers have argued that this distortion influenced where Londoners were willing to live, and therefore where prices rose. Two areas of equal real distance from the centre can differ substantially in value if one of them appears closer on the diagram.\n\nThere is a further oddity. Studies of passenger behaviour have found that travellers frequently choose routes that are longer in time because they look shorter on the map — changing trains twice to avoid a walk that would have been quicker. People navigate the representation, not the city.\n\nBeck was paid five guineas for the original drawing. He continued revising it for nearly thirty years, largely without recognition, and died in 1974 before the design was widely credited to him.",
+  glossary: {
+    "diagram": "схема", "angles": "углы", "neat": "аккуратный", "resembled": "напоминал, походил на",
+    "draughtsman": "чертёжник", "temporarily": "временно", "reasoned": "рассудил",
+    "rejected": "отвергли", "radical": "радикальный", "trial run": "пробный тираж",
+    "recognisable": "узнаваемый", "compresses": "сжимает", "suburbs": "пригороды",
+    "distortion": "искажение", "influenced": "повлияло", "substantially": "существенно",
+    "oddity": "странность", "navigate": "ориентируются", "representation": "изображение, представление",
+    "revising": "дорабатывая", "recognition": "признание", "credited": "приписан (авторство)"
+  },
+  questions: [
+    { q: "What was Beck's key insight?", options: ["Passengers need accurate distances", "Passengers only need to know where to change trains", "The Thames should be removed"], answer: 1, explain: "Под землёй важно не где ты, а где пересадка." },
+    { q: "What effect on London does the text describe?", options: ["It changed perceptions of distance and affected property prices", "It reduced the number of passengers", "It made suburbs physically closer"], answer: 0, explain: "Искажение повлияло на то, где люди соглашались жить, и на цены." },
+    { q: "What does 'People navigate the representation, not the city' mean?", options: ["Londoners memorise the city perfectly", "Travellers follow the diagram even when it costs them time", "Maps should be more accurate"], answer: 1, explain: "Люди выбирают маршрут по схеме, даже если он дольше." }
+  ]
+},
+{
+  id: "t06", lvl: "B2", mins: 3,
+  title: "The Accent You Cannot Hear",
+  ru_title: "Акцент, который вы не слышите",
+  text: "Learners often assume that understanding a foreign language is mainly a question of vocabulary. If you know the words, surely you will recognise them when they are spoken. In practice, comprehension breaks down for a different reason: fluent speakers do not pronounce words the way dictionaries do.\n\nConsider the phrase 'what are you going to do'. Written out, it contains six words. Spoken quickly by an American, it may contain what sounds like two: 'whatcha gonna do'. Nothing has been mispronounced. The speaker has applied ordinary reductions that every native uses and almost none can describe. Learners who studied from carefully articulated recordings hear a stream of noise and conclude that their vocabulary has failed them, when in fact their expectations have.\n\nThe pattern differs by variety. British speakers, particularly in formal registers, tend to keep more consonants intact, which is one reason many learners find British English easier at first. American speech reduces more aggressively: the t in 'water' or 'better' becomes a soft d, vowels in unstressed syllables collapse towards a neutral sound, and whole auxiliary verbs disappear into the words around them. 'He would have told you' can survive as something close to 'he'd-a told ya'.\n\nNone of this is laziness or bad speech. Every language does it; Russian speakers reduce unstressed vowels so thoroughly that foreigners struggle equally. The difficulty is simply that reductions are rarely taught, because they look like errors on paper.\n\nThe practical remedy is unusual: instead of listening more, listen to the same short passage repeatedly until every reduced form becomes predictable. Ten seconds understood completely teaches more than ten minutes half-followed.",
+  glossary: {
+    "assume": "полагать, предполагать", "comprehension": "понимание", "breaks down": "даёт сбой",
+    "reductions": "редукции, сокращения в речи", "articulated": "проговорённый, артикулированный",
+    "stream": "поток", "conclude": "заключают", "expectations": "ожидания", "variety": "разновидность языка",
+    "registers": "регистры речи", "intact": "нетронутый, целый", "aggressively": "активно, агрессивно",
+    "unstressed": "безударный", "syllables": "слоги", "collapse": "схлопываются", "auxiliary": "вспомогательный",
+    "survive": "сохраняться", "laziness": "лень", "thoroughly": "основательно", "struggle": "испытывают трудности",
+    "remedy": "средство, решение", "predictable": "предсказуемый"
+  },
+  questions: [
+    { q: "Why do learners fail to recognise words they know?", options: ["Their vocabulary is too small", "Fluent speech reduces and merges words", "Native speakers use rare synonyms"], answer: 1, explain: "Беглая речь сокращает и сливает слова — словарь тут ни при чём." },
+    { q: "Why do many learners find British English easier at first?", options: ["It is spoken more slowly everywhere", "It uses simpler grammar", "It tends to keep more consonants intact"], answer: 2, explain: "Британская речь, особенно формальная, сохраняет больше согласных." },
+    { q: "What method does the author recommend?", options: ["Listening to as much material as possible", "Repeating one short passage until every form is predictable", "Reading transcripts instead of listening"], answer: 1, explain: "Десять секунд, понятых полностью, дают больше, чем десять минут наполовину." }
+  ]
+},
+{
+  id: "t07", lvl: "C1", mins: 4,
+  title: "The Quiet Authority of Defaults",
+  ru_title: "Тихая власть настроек по умолчанию",
+  text: "Few design decisions exert as much influence, with as little visibility, as the default. Whatever option is pre-selected will be chosen by the overwhelming majority of users, not because they have weighed the alternatives and approved, but because changing it requires an act of attention that most people, most of the time, decline to make.\n\nThe most cited illustration concerns organ donation. Countries that ask citizens to opt in to the donor register report participation rates that are frequently below twenty per cent. Countries that enrol citizens automatically and allow them to opt out report rates above ninety. The populations are not morally different; the forms are. It would be naive to conclude that the second system reveals genuine consent, and equally naive to pretend the first reveals genuine refusal. What the comparison exposes is that in both cases the answer was largely supplied by whoever designed the paperwork.\n\nOnce this is understood, the notion of a neutral default collapses. There is no option that imposes nothing, because refusing to pre-select is itself a choice with predictable consequences — usually inaction. Designers who insist they are merely presenting options are, in effect, exercising authority while disclaiming it.\n\nThis has uncomfortable implications for anyone building systems that people use daily. A privacy setting shipped as 'on' and a privacy setting shipped as 'off' will produce entirely different societies of users, and the difference will not show up in any survey of stated preferences, because stated preferences are not what defaults act upon. They act upon inertia.\n\nThe honest response is not to abandon defaults, which is impossible, but to choose them as though one were choosing on behalf of the user rather than the institution — and to make the alternative genuinely easy to reach. A default that can be changed in one gesture is a suggestion. A default buried three menus deep is a decision made for someone else and dressed up as their own.",
+  glossary: {
+    "exert": "оказывать (влияние)", "visibility": "заметность", "default": "значение по умолчанию",
+    "overwhelming": "подавляющий", "weighed": "взвесили", "decline": "отказываются",
+    "cited": "цитируемый", "opt in": "согласиться, подписаться", "enrol": "записывают, включают",
+    "opt out": "отказаться, выйти", "naive": "наивный", "consent": "согласие", "refusal": "отказ",
+    "exposes": "обнажает", "supplied": "предоставлен", "notion": "представление, понятие",
+    "collapses": "рушится", "imposes": "навязывает", "inaction": "бездействие",
+    "disclaiming": "отрекаясь от", "implications": "следствия", "shipped": "поставляемый, выпущенный",
+    "inertia": "инерция", "abandon": "отказаться от", "on behalf of": "в интересах, от имени",
+    "gesture": "жест, действие", "buried": "спрятанный, погребённый"
+  },
+  questions: [
+    { q: "What does the organ donation comparison demonstrate?", options: ["Some populations are more generous than others", "The form design largely supplies the answer", "Opt-out systems reveal true consent"], answer: 1, explain: "Автор прямо говорит: населения не различаются морально — различаются анкеты." },
+    { q: "Why does the author say a neutral default is impossible?", options: ["Because users always change settings", "Because institutions are dishonest", "Because not pre-selecting is itself a choice producing inaction"], answer: 2, explain: "Отказ от предвыбора — тоже выбор с предсказуемым следствием." },
+    { q: "What distinction does the final paragraph draw?", options: ["Between suggestions and decisions made for someone", "Between privacy and convenience", "Between designers and institutions"], answer: 0, explain: "Легко изменяемая настройка — подсказка; спрятанная — решение за человека." }
+  ]
+},
+{
+  id: "t08", lvl: "C1", mins: 4,
+  title: "What Expertise Actually Looks Like",
+  ru_title: "Как на самом деле выглядит экспертность",
+  text: "The popular account of expertise holds that experts know more. They do, but that is the least interesting thing about them, and it explains little about how they behave under pressure.\n\nStudies of chess masters conducted in the nineteen-sixties produced a result that has shaped the field ever since. Masters shown a position from a real game for five seconds could reconstruct it almost perfectly, while weaker players managed only a fraction. The obvious conclusion — superior memory — turned out to be wrong. When the same masters were shown pieces scattered at random, their advantage vanished entirely. They were not remembering pieces. They were remembering meaningful configurations, and a random board contained none.\n\nThis distinction runs through every domain that has been examined. The experienced physician does not consciously run through a longer list of diagnoses; they perceive the case as an instance of a pattern, and the list they run through is shorter, not longer. Expertise compresses. It replaces deliberate search with recognition, which is why experts are frequently unable to explain their own reasoning in any detail, and why their explanations, when offered, are often reconstructions rather than accounts.\n\nThe uncomfortable corollary is that pattern recognition fails silently. A physician who has seen a thousand routine cases will perceive the thousand-and-first as routine, and the rare presentation that does not fit will be quietly assimilated to the familiar shape. Errors of expertise are rarely errors of ignorance; they are errors of confident misclassification, and they are correspondingly hard to catch, because nothing feels wrong.\n\nWhat distinguishes the strongest practitioners, then, is not the absence of this tendency but a habit of deliberate suspicion — a trained instinct for the moment when a case is fitting the pattern slightly too well.",
+  glossary: {
+    "account": "трактовка, изложение", "holds": "утверждает", "reconstruct": "восстановить",
+    "fraction": "малая часть", "superior": "превосходящий", "scattered": "разбросанный",
+    "vanished": "исчезло", "configurations": "конфигурации, сочетания", "distinction": "различие",
+    "domain": "область", "physician": "врач", "consciously": "сознательно", "diagnoses": "диагнозы",
+    "perceive": "воспринимают", "instance": "случай, экземпляр", "compresses": "сжимает",
+    "deliberate": "осознанный, намеренный", "recognition": "распознавание", "reasoning": "рассуждение",
+    "reconstructions": "реконструкции", "corollary": "следствие", "assimilated": "подогнан, уподоблен",
+    "ignorance": "незнание", "misclassification": "ошибочная классификация",
+    "correspondingly": "соответственно", "practitioners": "практики, специалисты",
+    "suspicion": "подозрение", "instinct": "чутьё"
+  },
+  questions: [
+    { q: "What did the chess experiment actually show?", options: ["Masters have better general memory", "Masters remember meaningful patterns, not pieces", "Weaker players concentrate poorly"], answer: 1, explain: "На случайной расстановке преимущество мастеров исчезало полностью." },
+    { q: "Why can experts often not explain their reasoning?", options: ["They deliberately keep it secret", "They reason more slowly than novices", "Recognition replaces deliberate step-by-step search"], answer: 2, explain: "Экспертность сжимает поиск до узнавания, которое трудно развернуть словами." },
+    { q: "What kind of error does expertise typically produce?", options: ["Confident misclassification of the unfamiliar as familiar", "Errors caused by gaps in knowledge", "Errors from working too slowly"], answer: 0, explain: "Ошибки экспертов — не от незнания, а от уверенного отнесения к привычному образцу." }
+  ]
+}
+];
+/* Американские редукции: full — как пишется, heard — как реально звучит,
+   note — что именно происходит со звуком */
+const REDUCTIONS = [
+{ full: "What are you going to do about it?", heard: "Whatcha gonna do about it?", ru: "И что ты будешь с этим делать?",
+  note: "what are you → whatcha, going to → gonna" },
+{ full: "I have got to go now.", heard: "I gotta go now.", ru: "Мне пора идти.",
+  note: "have got to → gotta, начальное have проглатывается" },
+{ full: "Did you eat yet?", heard: "Jeet yet?", ru: "Ты уже поел?",
+  note: "did you → dʒə, сливается в один слог" },
+{ full: "I want to talk to you.", heard: "I wanna talk to ya.", ru: "Я хочу с тобой поговорить.",
+  note: "want to → wanna, you → ya" },
+{ full: "Let me see what I can do.", heard: "Lemme see what I can do.", ru: "Дай посмотрю, что можно сделать.",
+  note: "let me → lemme" },
+{ full: "He would have told you.", heard: "He'd-a told ya.", ru: "Он бы тебе сказал.",
+  note: "would have → 'd-a, вспомогательные схлопываются" },
+{ full: "I do not know what it is.", heard: "I dunno what it is.", ru: "Я не знаю, что это.",
+  note: "do not know → dunno" },
+{ full: "Give me a couple of minutes.", heard: "Gimme a coupla minutes.", ru: "Дай мне пару минут.",
+  note: "give me → gimme, couple of → coupla" },
+{ full: "A lot of people think so.", heard: "A lotta people think so.", ru: "Многие так думают.",
+  note: "lot of → lotta" },
+{ full: "Because of the weather, we stayed.", heard: "Cuz of the weather, we stayed.", ru: "Из-за погоды мы остались.",
+  note: "because → cuz" },
+{ full: "Get out of here.", heard: "Geddouda here.", ru: "Да ладно / Уходи отсюда.",
+  note: "t между гласными → мягкое d, out of → outta" },
+{ full: "I need a glass of water.", heard: "I need a glass of wader.", ru: "Мне нужен стакан воды.",
+  note: "water → wader: flap T, классическая американская черта" },
+{ full: "It is better than nothing.", heard: "It's bedder than nothin'.", ru: "Это лучше, чем ничего.",
+  note: "better → bedder, -ing → -in'" },
+{ full: "I am not sure about that.", heard: "I'm not sher about that.", ru: "Я не уверен насчёт этого.",
+  note: "sure → sher, безударные гласные схлопываются" },
+{ full: "Are you coming or not?", heard: "Ya comin' er not?", ru: "Ты идёшь или нет?",
+  note: "are you → ya, or → er" },
+{ full: "He should have known better.", heard: "He shoulda known bedder.", ru: "Он должен был лучше соображать.",
+  note: "should have → shoulda" },
+{ full: "Twenty dollars is too much.", heard: "Twenny dollars is too much.", ru: "Двадцать долларов — это слишком.",
+  note: "twenty → twenny: nt после ударения теряет t" },
+{ full: "I will let you know tomorrow.", heard: "I'll letcha know tomorrow.", ru: "Я сообщу тебе завтра.",
+  note: "let you → letcha" },
+{ full: "Can you hear me?", heard: "Kin ya hear me?", ru: "Ты меня слышишь?",
+  note: "can в безударной позиции → kin, почти исчезает" },
+{ full: "I cannot hear you.", heard: "I can't hear ya.", ru: "Я тебя не слышу.",
+  note: "внимание: can и can't в американской речи различаются ударением, а не звуком t" },
+{ full: "What do you think about it?", heard: "Whaddya think about it?", ru: "Что ты об этом думаешь?",
+  note: "what do you → whaddya" },
+{ full: "I am going to send it to you.", heard: "I'm gonna send it to ya.", ru: "Я тебе это пришлю.",
+  note: "going to → gonna, to you → to ya" },
+{ full: "Kind of expensive, is it not?", heard: "Kinda expensive, isn't it?", ru: "Дороговато, не так ли?",
+  note: "kind of → kinda" },
+{ full: "Come and take a look at this.", heard: "C'mon take a look at this.", ru: "Иди-ка взгляни на это.",
+  note: "come and → c'mon, and почти исчезает" },
+{ full: "She has been working all day.", heard: "She's been workin' all day.", ru: "Она работала весь день.",
+  note: "has been → 's been, -ing → -in'" },
+{ full: "Most of them are already here.", heard: "Mosta them're already here.", ru: "Большинство из них уже здесь.",
+  note: "most of → mosta, are → 're" },
+{ full: "I will call you later, all right?", heard: "I'll call ya later, aight?", ru: "Я позвоню позже, хорошо?",
+  note: "all right → aight" },
+{ full: "There is a lot going on.", heard: "There's a lot goin' on.", ru: "Много всего происходит.",
+  note: "there is → there's, -ing → -in'" },
+{ full: "Do you want to grab a coffee?", heard: "Wanna grab a coffee?", ru: "Хочешь сходить за кофе?",
+  note: "do you want to → wanna, начало предложения проглатывается целиком" },
+{ full: "It is not as bad as it looks.", heard: "It's nod as bad as it looks.", ru: "Всё не так плохо, как выглядит.",
+  note: "not as → nod as: flap T между гласными" }
+];
 /* ================= Fluently — логика приложения ================= */
 "use strict";
 
@@ -4542,7 +4840,7 @@ const store = {
     try { this.data = JSON.parse(localStorage.getItem(this.key)) || {}; }
     catch (e) { this.data = {}; }
     this.data.srs = this.data.srs || {};
-    this.data.settings = Object.assign({ newPerDay: 10, direction: "en", rate: 0.9 }, this.data.settings);
+    this.data.settings = Object.assign({ newPerDay: 10, direction: "en", rate: 0.9, accent: "US" }, this.data.settings);
     this.data.streak = this.data.streak || { last: null, count: 0 };
     this.data.days = this.data.days || {};
     this.data.grammar = this.data.grammar || {};
@@ -4557,6 +4855,9 @@ const store = {
     this.data.badges = this.data.badges || {};      // { id: дата получения }
     this.data.calibrated = this.data.calibrated || {}; // { "B1": true }
     this.data.dictation = this.data.dictation || { correct: 0, total: 0, runs: 0 };
+    this.data.reading = this.data.reading || {};
+    this.data.reductions = this.data.reductions || null;
+    this.data.vocabTest = this.data.vocabTest || null;
   },
   save() {
     try { localStorage.setItem(this.key, JSON.stringify(this.data)); } catch (e) {}
@@ -4625,23 +4926,35 @@ function gradeWord(id, grade) { // grade: 0 снова, 1 трудно, 2 пом
 
 /* ---------------- Озвучка (Web Speech API) ---------------- */
 const tts = {
-  voice: null, voiceB: null, voiceRu: null, ready: false,
+  us: null, gb: null, voiceRu: null, ready: false,
   init() {
     if (!("speechSynthesis" in window)) return;
     const pick = () => {
       const all = speechSynthesis.getVoices();
       const vs = all.filter(v => v.lang && v.lang.toLowerCase().startsWith("en"));
       const ru = all.filter(v => v.lang && v.lang.toLowerCase().startsWith("ru"));
-      if (ru.length) this.voiceRu = ru.find(v => v.name === "Milena") || ru.find(v => v.name.includes("Google")) || ru[0];
+      if (ru.length) this.voiceRu = ru.find(v => v.name === "Milena") || ru.find(v => v.name.indexOf("Google") >= 0) || ru[0];
       if (!vs.length) return;
-      const pref = ["Samantha", "Daniel", "Karen", "Moira", "Google US English", "Google UK English Female"];
-      this.voice = vs.find(v => pref.includes(v.name)) || vs.find(v => v.lang === "en-US") || vs[0];
-      this.voiceB = vs.find(v => v !== this.voice && v.lang !== this.voice.lang) || vs.find(v => v !== this.voice) || this.voice;
+      const usPref = ["Samantha", "Alex", "Google US English", "Aaron", "Nicky"];
+      const gbPref = ["Daniel", "Kate", "Google UK English Female", "Google UK English Male", "Serena"];
+      const byLang = (p) => vs.filter(v => v.lang.toLowerCase().replace("_", "-").indexOf(p) === 0);
+      const usAll = byLang("en-us"), gbAll = byLang("en-gb");
+      this.us = usAll.find(v => usPref.indexOf(v.name) >= 0) || usAll[0] || vs[0];
+      this.gb = gbAll.find(v => gbPref.indexOf(v.name) >= 0) || gbAll[0] || this.us;
       this.ready = true;
     };
     pick();
     speechSynthesis.onvoiceschanged = pick;
   },
+  /* Голос по текущей настройке акцента; alt — второй собеседник в диалоге */
+  pickVoice(opts) {
+    const acc = opts.accent || store.data.settings.accent || "US";
+    const main = acc === "GB" ? this.gb : this.us;
+    const other = acc === "GB" ? this.us : this.gb;
+    return opts.alt ? (other || main) : main;
+  },
+  accentLang() { return (store.data.settings.accent || "US") === "GB" ? "en-GB" : "en-US"; },
+  hasBoth() { return !!(this.us && this.gb && this.us !== this.gb); },
   speak(text, opts) {
     opts = opts || {};
     if (!("speechSynthesis" in window)) return;
@@ -4661,8 +4974,9 @@ const tts = {
               u.lang = "ru-RU";
               if (this.voiceRu) u.voice = this.voiceRu;
             } else {
-              u.lang = "en-US";
-              if (this.voice) u.voice = opts.alt ? this.voiceB : this.voice;
+              const v = this.pickVoice(opts);
+              u.lang = opts.accent === "GB" ? "en-GB" : opts.accent === "US" ? "en-US" : this.accentLang();
+              if (v) u.voice = v;
             }
             u.rate = rate;
             if (opts.onend && i === parts.length - 1) u.onend = opts.onend;
@@ -4698,6 +5012,7 @@ function show(id) {
   if (id === "scr-listen") renderListenLevels();
   if (id === "scr-speak") { stt.stop(); renderSpeak(); }
   if (id === "scr-stats") renderStats();
+  if (id === "scr-reading") renderReading();
 }
 
 /* ---------------- Очки, недельная лига и достижения ---------------- */
@@ -5023,6 +5338,19 @@ function renderHome() {
       (i < p.step ? "✓ " : "") + s.icon + " " + esc(s.label)).join("  ·  ") +
       "<br>дальше — " + esc(nx.label.toLowerCase()) + (nx.why ? " <b>(" + esc(nx.why) + ")</b>" : "");
   }
+  document.querySelectorAll("[data-accent]").forEach(b =>
+    b.classList.toggle("on", b.dataset.accent === (store.data.settings.accent || "US")));
+  $("accent-hint").textContent = tts.hasBoth()
+    ? "Британский звучит чётче, американский — так, как говорят в кино и сериалах."
+    : "На этом устройстве доступен один английский голос — переключение может не дать разницы.";
+  const vt = store.data.vocabTest;
+  $("vt-hint").textContent = vt
+    ? "Последняя оценка: ~" + vt.estimate + " слов (уровень " + vt.level + "), " + vt.date
+    : "48 слов из разных уровней — и приложение оценит твой словарный запас.";
+  const rdDone = Object.keys(store.data.reading || {}).length;
+  $("home-reading-d").textContent = rdDone
+    ? "Прочитано текстов: " + rdDone + " из " + READING.length
+    : "Тексты с тапом по словам — слово сразу в карточки";
   $("home-stats-d").textContent = an.weak
     ? "Слабое место: " + an.weak.label.toLowerCase() + " · " + an.weak.pct + "%"
     : "Что идёт хорошо, что подтянуть";
@@ -5497,6 +5825,15 @@ function renderListenLevels() {
     b.onclick = () => startListening(lv.level);
     box.appendChild(b);
   });
+  box.appendChild(el("div", "sethdr", "Американская беглая речь"));
+  const rst = store.data.reductions;
+  const rb = el("button", "listrow");
+  rb.innerHTML = "<span class='ic'>🇺🇸</span><span class='grow'><span class='t'>Понять американца</span><br>" +
+    "<span class='d'>whatcha, gonna, wader — сокращения, которые съедают слова" +
+    (rst ? " · лучший результат " + rst.best + "/10" : "") + "</span></span><span class='arr'>›</span>";
+  rb.onclick = () => { dayPlan.active = false; startReductions(); };
+  box.appendChild(rb);
+
   box.appendChild(el("div", "sethdr", "Диктант — печатать услышанное"));
   const dst = store.data.dictation;
   LLEVELS.forEach(lv => {
@@ -5692,6 +6029,439 @@ function renderDict() {
   };
   check.onclick = submit;
   input.addEventListener("keydown", e => { if (e.key === "Enter") submit(); });
+}
+
+/* ---------------- Чтение: тап по слову → перевод → в свои карточки ---------------- */
+let DICT = null;
+function dictLookup(word) {
+  if (!DICT) {
+    DICT = {};
+    BASE_WORDS.forEach(w => { DICT[w.en.toLowerCase()] = w.ru; });
+  }
+  const w = word.toLowerCase();
+  if (DICT[w]) return DICT[w];
+  // простые словоформы: множественное число, -ed, -ing, -ly
+  const stems = [w.replace(/ies$/, "y"), w.replace(/es$/, ""), w.replace(/s$/, ""),
+    w.replace(/ed$/, ""), w.replace(/ed$/, "e"), w.replace(/ing$/, ""), w.replace(/ing$/, "e"),
+    w.replace(/ly$/, ""), w.replace(/ied$/, "y")];
+  for (let i = 0; i < stems.length; i++) if (stems[i] !== w && DICT[stems[i]]) return DICT[stems[i]];
+  return null;
+}
+
+function readingProgress(t) { return (store.data.reading || {})[t.id]; }
+
+function renderReading() {
+  const box = $("reading-list");
+  box.innerHTML = "";
+  const pool = READING.filter(t => levelIndex(t.lvl) <= levelIndex(currentLevel()));
+  const shown = pool.length ? pool : READING.filter(t => t.lvl === "B1");
+  let lastLvl = null;
+  shown.forEach(t => {
+    if (t.lvl !== lastLvl) { lastLvl = t.lvl; box.appendChild(el("div", "sethdr", t.lvl + " · " + LEVEL_INFO[t.lvl].name)); }
+    const st = readingProgress(t);
+    const b = el("button", "listrow");
+    b.innerHTML = "<span class='ic'>" + (st ? "✅" : "📖") + "</span>" +
+      "<span class='grow'><span class='t'>" + esc(t.title) + "</span><br>" +
+      "<span class='d'>" + esc(t.ru_title) + " · " + t.mins + " мин" +
+      (st ? " · " + st.correct + "/" + t.questions.length : "") + "</span></span><span class='arr'>›</span>";
+    b.onclick = () => openText(t.id);
+    box.appendChild(b);
+  });
+  const added = (store.data.custom || []).filter(c => c.from === "reading").length;
+  box.appendChild(el("div", "card", "<div class='mnote' style='margin-top:0'>📖 <b>Тапни любое слово в тексте</b> — увидишь перевод и сможешь отправить его в свои карточки. " +
+    "Именно так словарь растёт после B2: не списком, а тем, что реально встретил." +
+    (added ? " Из текстов уже добавлено слов: <b>" + added + "</b>." : "") + "</div>"));
+}
+
+const rd = { t: null, qidx: 0, correct: 0 };
+
+function openText(id) {
+  const t = READING.filter(x => x.id === id)[0];
+  rd.t = t; rd.qidx = 0; rd.correct = 0;
+  $("word-pop").classList.add("hidden");
+  $("read-title").textContent = t.title;
+  const box = $("read-body");
+  box.innerHTML = "";
+
+  const head = el("div", "card");
+  head.innerHTML = "<div class='cardhdr'>" + t.lvl + " · " + t.mins + " мин чтения</div>" +
+    "<div class='mnote' style='margin-top:0'>" + esc(t.ru_title) + " — тапни незнакомое слово, чтобы увидеть перевод</div>";
+  box.appendChild(head);
+
+  const art = el("div", "card article");
+  t.text.split("\n\n").forEach(par => {
+    const p = el("p", "en");
+    par.split(/(\s+)/).forEach(tok => {
+      if (/^\s+$/.test(tok)) { p.appendChild(document.createTextNode(tok)); return; }
+      const clean = tok.replace(/[^A-Za-z'-]/g, "");
+      if (!clean) { p.appendChild(document.createTextNode(tok)); return; }
+      const span = el("span", "tapw", esc(tok));
+      span.onclick = () => showWordCard(clean, t);
+      p.appendChild(span);
+    });
+    art.appendChild(p);
+  });
+  box.appendChild(art);
+
+  const listen = el("button", "btn soft", "🔊 Прочитать вслух");
+  listen.onclick = () => tts.speak(t.text.replace(/\n\n/g, " "));
+  box.appendChild(listen);
+
+  const go = el("button", "btn", "Вопросы по тексту (" + t.questions.length + ")");
+  go.onclick = () => startReadQuestions();
+  box.appendChild(go);
+
+  show("scr-read");
+}
+
+function showWordCard(word, t) {
+  const pop = $("word-pop");
+  const glos = t.glossary[word.toLowerCase()] || t.glossary[word];
+  const ru = glos || dictLookup(word);
+  pop.innerHTML = "";
+  pop.classList.remove("hidden");
+
+  const head = el("div", "row");
+  head.style.alignItems = "center";
+  head.innerHTML = "<span class='grow'><span class='pen en' style='font-size:1.15rem;font-weight:650'>" + esc(word) + "</span>" +
+    "<div class='pru'>" + (ru ? esc(ru) : "нет перевода в словаре") + "</div></span>";
+  const sp = el("button", "speakbtn", "🔊");
+  sp.onclick = () => tts.speak(word);
+  head.appendChild(sp);
+  const close = el("button", "speakbtn ru", "✕");
+  close.setAttribute("aria-label", "Закрыть");
+  close.onclick = () => pop.classList.add("hidden");
+  head.appendChild(close);
+  pop.appendChild(head);
+
+  const already = (store.data.custom || []).some(c => c.en.toLowerCase() === word.toLowerCase()) ||
+    BASE_WORDS.some(w => w.en.toLowerCase() === word.toLowerCase() && srsState(w.id));
+  if (ru) {
+    const add = el("button", "btn small", already ? "✓ Уже в карточках" : "＋ В мои карточки");
+    add.disabled = already;
+    add.onclick = () => {
+      store.data.customSeq++;
+      store.data.custom.push({ id: "c" + store.data.customSeq, en: word, ru: ru, ex: "", exr: "", tr: "", theme: "custom", from: "reading" });
+      store.save(); refreshWords();
+      add.textContent = "✓ Добавлено в карточки";
+      add.disabled = true;
+      addXP(2);
+      setTimeout(() => pop.classList.add("hidden"), 900); // не загораживаем текст
+    };
+    pop.appendChild(add);
+  } else {
+    const add = el("button", "btn small", "＋ Добавить со своим переводом");
+    add.onclick = () => {
+      pop.classList.add("hidden");
+      ["aw-en", "aw-ru", "aw-ex", "aw-exr"].forEach(id => { $(id).value = ""; });
+      $("aw-en").value = word;
+      $("aw-err").classList.add("hidden");
+      $("aw-done").classList.add("hidden");
+      show("scr-addword");
+      setTimeout(() => { try { $("aw-ru").focus(); } catch (e) {} }, 250);
+    };
+    pop.appendChild(add);
+  }
+}
+
+function startReadQuestions() {
+  rd.qidx = 0; rd.correct = 0;
+  $("rq-title").textContent = rd.t.title;
+  show("scr-readq");
+  renderReadQuestion();
+}
+
+function renderReadQuestion() {
+  const t = rd.t, total = t.questions.length;
+  $("rq-count").textContent = Math.min(rd.qidx + 1, total) + " / " + total;
+  $("rq-bar").style.width = Math.round(100 * rd.qidx / total) + "%";
+  const box = $("rq-body");
+  box.innerHTML = "";
+  if (rd.qidx >= total) {
+    $("rq-count").textContent = "";
+    $("rq-bar").style.width = "100%";
+    store.data.reading = store.data.reading || {};
+    store.data.reading[t.id] = { correct: rd.correct, total: total, date: todayStr() };
+    store.save();
+    markActivity();
+    showXP(box); showBadges(box);
+    const d = el("div", "card donebox",
+      "<div class='big'>" + (rd.correct === total ? "📖✨" : "📖") + "</div><h3>" + rd.correct + " из " + total + "</h3>" +
+      "<p>" + (rd.correct === total ? "Текст понят полностью. Слова из него, добавленные в карточки, теперь закрепятся."
+        : "Перечитай места, где ошибся — ответы всегда есть в тексте.") + "</p>");
+    const again = el("button", "btn ghost", "Вернуться к тексту");
+    again.onclick = () => openText(t.id);
+    const back = el("button", "btn", "К текстам");
+    back.onclick = () => show("scr-reading");
+    planDoneButtons(d, [again, back]);
+    box.appendChild(d);
+    return;
+  }
+  const q = t.questions[rd.qidx];
+  const stack = el("div", "stack");
+  stack.appendChild(el("div", "card", "<div class='en' style='font-size:1.05rem;line-height:1.5'>" + esc(q.q) + "</div>"));
+  const opts = el("div", "stack");
+  q.options.forEach((o, oi) => {
+    const b = el("button", "opt en", esc(o));
+    b.onclick = () => {
+      const ok = oi === q.answer;
+      opts.querySelectorAll("button").forEach((bb, i) => {
+        bb.disabled = true;
+        if (i === q.answer) bb.classList.add(ok ? "sel-good" : "reveal");
+      });
+      if (!ok) b.classList.add("sel-bad");
+      if (ok) { rd.correct++; addXP(4); }
+      stack.appendChild(el("div", "feedback " + (ok ? "ok" : "no"),
+        (ok ? "✓ Верно. " : "✗ Правильный ответ: «" + esc(q.options[q.answer]) + "». ") + esc(q.explain)));
+      const next = el("button", "btn", rd.qidx + 1 >= total ? "Результат" : "Дальше");
+      next.onclick = () => { rd.qidx++; renderReadQuestion(); };
+      stack.appendChild(next);
+      next.scrollIntoView({ block: "nearest" });
+    };
+    opts.appendChild(b);
+  });
+  stack.appendChild(opts);
+  box.appendChild(stack);
+}
+
+/* ---------------- Американская беглая речь: редукции ---------------- */
+const red = { items: [], idx: 0, correct: 0 };
+
+function startReductions() {
+  const pool = REDUCTIONS.slice();
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  red.items = pool.slice(0, 10);
+  red.idx = 0; red.correct = 0;
+  show("scr-reduction");
+  renderReduction();
+}
+
+function renderReduction() {
+  const total = red.items.length;
+  $("red-count").textContent = Math.min(red.idx + 1, total) + " / " + total;
+  $("red-bar").style.width = Math.round(100 * red.idx / total) + "%";
+  const box = $("red-body");
+  box.innerHTML = "";
+  if (red.idx >= total) {
+    $("red-count").textContent = "";
+    $("red-bar").style.width = "100%";
+    const prev = store.data.reductions || { best: 0, runs: 0 };
+    store.data.reductions = { best: Math.max(prev.best, red.correct), runs: prev.runs + 1 };
+    markActivity();
+    showXP(box); showBadges(box);
+    const d = el("div", "card donebox",
+      "<div class='big'>" + (red.correct >= 7 ? "🇺🇸✨" : "🇺🇸") + "</div><h3>" + red.correct + " из " + total + "</h3>" +
+      "<p>" + (red.correct >= 7
+        ? "Ухо привыкает к американским сокращениям. Именно они и мешают понимать беглую речь."
+        : "Это самая трудная часть американского английского. Слушай медленно, потом в обычном темпе — и так по кругу.") + "</p>");
+    const again = el("button", "btn ghost", "Ещё раз");
+    again.onclick = () => { dayPlan.active = false; startReductions(); };
+    const back = el("button", "btn", "К аудированию");
+    back.onclick = () => show("scr-listen");
+    planDoneButtons(d, [again, back]);
+    box.appendChild(d);
+    return;
+  }
+  const item = red.items[red.idx];
+  const stack = el("div", "stack");
+
+  const player = el("div", "card");
+  player.style.textAlign = "center";
+  player.innerHTML = "<div class='mnote' style='margin-bottom:10px'>Слушай американскую беглую речь и выбери, что было сказано</div>";
+  const prow = el("div", "row");
+  prow.style.justifyContent = "center";
+  const play = el("button", "speakbtn big", "🔊");
+  play.setAttribute("aria-label", "Прослушать бегло");
+  play.onclick = () => tts.speak(item.heard, { accent: "US", rate: 1 });
+  const slow = el("button", "speakbtn big", "🐢");
+  slow.setAttribute("aria-label", "Медленно по словам");
+  slow.onclick = () => tts.speak(item.heard, { accent: "US", slow: true });
+  prow.appendChild(play); prow.appendChild(slow);
+  player.appendChild(prow);
+  stack.appendChild(player);
+
+  // варианты: правильная полная форма и два похожих отвлекающих
+  const others = REDUCTIONS.filter(r => r !== item);
+  const decoys = [];
+  while (decoys.length < 2 && others.length) {
+    decoys.push(others.splice(Math.floor(Math.random() * others.length), 1)[0].full);
+  }
+  const opts = [item.full].concat(decoys);
+  for (let i = opts.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [opts[i], opts[j]] = [opts[j], opts[i]];
+  }
+  const answer = opts.indexOf(item.full);
+
+  const optBox = el("div", "stack");
+  opts.forEach((o, oi) => {
+    const b = el("button", "opt en", esc(o));
+    b.onclick = () => {
+      const ok = oi === answer;
+      optBox.querySelectorAll("button").forEach((bb, i) => {
+        bb.disabled = true;
+        if (i === answer) bb.classList.add(ok ? "sel-good" : "reveal");
+      });
+      if (!ok) b.classList.add("sel-bad");
+      if (ok) { red.correct++; addXP(4); } else addXP(1);
+      stack.appendChild(el("div", "feedback " + (ok ? "ok" : "no"),
+        (ok ? "✓ Верно. " : "✗ Прозвучало: ") +
+        "<b class='en'>" + esc(item.full) + "</b>" +
+        "<div class='mnote' style='margin-top:6px'>Реально слышится как: <b class='en'>" + esc(item.heard) + "</b></div>" +
+        "<div class='mnote'>Что происходит: " + esc(item.note) + "</div>" +
+        "<div class='mnote'>" + esc(item.ru) + "</div>"));
+      const cmp = el("div", "row");
+      const b1 = el("button", "btn soft small grow", "🇺🇸 Бегло");
+      b1.onclick = () => tts.speak(item.heard, { accent: "US", rate: 1 });
+      const b2 = el("button", "btn soft small grow", "🇬🇧 Чётко");
+      b2.onclick = () => tts.speak(item.full, { accent: "GB", rate: 0.85 });
+      cmp.appendChild(b1); cmp.appendChild(b2);
+      stack.appendChild(cmp);
+      const next = el("button", "btn", red.idx + 1 >= total ? "Результат" : "Дальше");
+      next.onclick = () => { red.idx++; renderReduction(); };
+      stack.appendChild(next);
+      next.scrollIntoView({ block: "nearest" });
+    };
+    optBox.appendChild(b);
+  });
+  stack.appendChild(optBox);
+  box.appendChild(stack);
+  tts.speak(item.heard, { accent: "US", rate: 1 });
+}
+
+/* ---------------- Тест на объём словаря ---------------- */
+/* Оценка по долям знакомых слов в выборке каждого уровня.
+   BAND — сколько примерно слов в языке приходится на диапазон каждого уровня. */
+const BAND = { B1: 2500, B2: 1500, C1: 3000, C2: 5000 };
+const vocab = { queue: [], answers: [], idx: 0 };
+
+function startVocabTest() {
+  const per = 12;
+  vocab.queue = [];
+  LEVELS.forEach(L => {
+    const pool = BASE_WORDS.filter(w => w.lvl === L);
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    pool.slice(0, per).forEach(w => vocab.queue.push(w));
+  });
+  vocab.answers = [];
+  vocab.idx = 0;
+  show("scr-vocabtest");
+  renderVocabTest();
+}
+
+function renderVocabTest() {
+  const total = vocab.queue.length;
+  $("vt-count").textContent = Math.min(vocab.idx + 1, total) + " / " + total;
+  $("vt-bar").style.width = Math.round(100 * vocab.idx / total) + "%";
+  const box = $("vt-body");
+  box.innerHTML = "";
+  if (vocab.idx >= total) {
+    $("vt-count").textContent = "";
+    $("vt-bar").style.width = "100%";
+    renderVocabResult(box);
+    return;
+  }
+  const w = vocab.queue[vocab.idx];
+  const card = el("div", "flash");
+  card.innerHTML = "<div class='word en'>" + esc(w.en) + "</div>" +
+    (w.tr ? "<div class='ipa'>[" + esc(w.tr) + "]</div>" : "");
+  const sp = el("button", "speakbtn", "🔊");
+  sp.onclick = () => tts.speak(w.en);
+  card.appendChild(sp);
+  box.appendChild(card);
+
+  box.appendChild(el("div", "michint", "Знаешь значение? Отвечай честно — от этого зависит точность оценки."));
+
+  const row = el("div", "row");
+  row.style.marginTop = "12px";
+  const no = el("button", "btn grow", "Не знаю");
+  const yes = el("button", "btn ghost grow", "Знаю ✓");
+  const record = (known) => {
+    vocab.answers.push({ lvl: w.lvl, known: known, word: w });
+    vocab.idx++;
+    renderVocabTest();
+  };
+  no.onclick = () => record(false);
+  yes.onclick = () => record(true);
+  row.appendChild(no); row.appendChild(yes);
+  box.appendChild(row);
+}
+
+function estimateVocab() {
+  const per = {};
+  LEVELS.forEach(L => { per[L] = { known: 0, total: 0 }; });
+  vocab.answers.forEach(a => { per[a.lvl].total++; if (a.known) per[a.lvl].known++; });
+  let estimate = 0;
+  const rows = [];
+  LEVELS.forEach(L => {
+    const p = per[L].total ? per[L].known / per[L].total : 0;
+    const words = Math.round(p * BAND[L]);
+    estimate += words;
+    rows.push({ lvl: L, pct: Math.round(100 * p), words: words, known: per[L].known, total: per[L].total });
+  });
+  // A1-A2 базовый слой: если человек справляется с B1, эти слова у него уже есть
+  const base = per.B1.total && per.B1.known / per.B1.total >= 0.4 ? 1500 : 800;
+  estimate += base;
+  let level = "A2";
+  if (estimate >= 10000) level = "C2";
+  else if (estimate >= 6500) level = "C1";
+  else if (estimate >= 4000) level = "B2";
+  else if (estimate >= 2300) level = "B1";
+  return { estimate: estimate, base: base, rows: rows, level: level };
+}
+
+function renderVocabResult(box) {
+  const r = estimateVocab();
+  store.data.vocabTest = { date: todayStr(), estimate: r.estimate, level: r.level };
+  store.save();
+  markActivity();
+
+  const head = el("div", "card");
+  head.style.textAlign = "center";
+  head.innerHTML = "<div class='cardhdr'>Оценка словарного запаса</div>" +
+    "<div style='font-size:2.6rem;font-weight:800;letter-spacing:-.03em;line-height:1.1'>~" + r.estimate.toLocaleString("ru-RU") + "</div>" +
+    "<div class='mnote'>слов · это примерно уровень <b>" + r.level + "</b></div>";
+  box.appendChild(head);
+
+  const detail = el("div", "card");
+  detail.innerHTML = "<div class='cardhdr'>Из чего сложилась цифра</div>" +
+    "<div class='metric'><div class='mrow'><span class='mlabel'>Базовый слой A1–A2</span>" +
+    "<span class='mval'>" + r.base + "</span></div>" +
+    "<div class='mnote'>Не проверяется напрямую — эти слова есть у всех, кто держит разговор.</div></div>" +
+    r.rows.map(x => pctBar(x.lvl + " · знакомо " + x.known + " из " + x.total, x.pct, "≈ " + x.words + " слов из диапазона " + BAND[x.lvl])).join("");
+  box.appendChild(detail);
+
+  const note = el("div", "card");
+  note.innerHTML = "<div class='cardhdr'>Насколько этому верить</div>" +
+    "<div class='mnote' style='margin-top:0'>Это <b>оценка, а не экзамен</b>. Она построена на выборке из 48 слов нашего словаря и честности твоих ответов. " +
+    "Погрешность легко ±20%. Настоящие тесты берут выборку из частотных списков на десятки тысяч слов.<br><br>" +
+    "Что цифра значит на практике: для свободного разговора хватает 3–4 тысяч, для чтения без словаря нужно 8–10 тысяч. " +
+    "Дальше словарь растёт в основном через чтение, а не через карточки.</div>";
+  box.appendChild(note);
+
+  const rec = el("div", "card");
+  const cur = currentLevel();
+  const suggest = r.level !== cur;
+  rec.innerHTML = "<div class='cardhdr'>Что делать дальше</div>" +
+    "<div class='mnote' style='margin-top:0'>" + (suggest
+      ? "Сейчас в приложении выбран уровень <b>" + cur + "</b>, а тест показывает <b>" + r.level + "</b>. Имеет смысл переключиться — тогда новые слова будут по силам, но не слишком просты."
+      : "Уровень <b>" + cur + "</b> в приложении совпадает с результатом теста. Ничего менять не нужно.") + "</div>";
+  if (suggest) {
+    const b = el("button", "btn small", "Переключить на " + r.level);
+    b.onclick = () => { store.data.level = r.level; store.save(); show("scr-home"); };
+    rec.appendChild(b);
+  }
+  box.appendChild(rec);
+
+  const back = el("button", "btn", "На главную");
+  back.onclick = () => show("scr-home");
+  box.appendChild(back);
 }
 
 /* ---------------- Резервная копия прогресса ---------------- */
@@ -6333,6 +7103,13 @@ function init() {
   });
 
   $("btn-calibrate").onclick = () => startCalibration(currentLevel());
+  $("btn-vocabtest").onclick = startVocabTest;
+  document.querySelectorAll("[data-accent]").forEach(b =>
+    b.addEventListener("click", () => {
+      store.data.settings.accent = b.dataset.accent;
+      store.save(); renderHome();
+      tts.speak(b.dataset.accent === "GB" ? "Right then, shall we get started?" : "Alright, let's get started.");
+    }));
 
   $("btn-export").onclick = exportProgress;
   $("btn-import").onclick = () => $("import-file").click();
